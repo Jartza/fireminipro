@@ -1,6 +1,12 @@
 #pragma once
+#include <QFont>
+#include <QString>
 #include <QAbstractTableModel>
 #include <QByteArray>
+#include <QBitArray>
+#include <QBrush>
+#include <QColor>
+#include <algorithm>
 
 class HexView : public QAbstractTableModel {
     Q_OBJECT

@@ -47,14 +47,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnSave      = new QPushButton("Save", groupBuffer);
     btnRead      = new QPushButton("Read",  groupBuffer);
     btnWrite     = new QPushButton("Write", groupBuffer);
-    chkAsciiSwap = new QCheckBox("ASCII byteswap", groupBuffer);
+    chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
 
     // layout
     gridB->addWidget(btnLoad,      0, 0);
     gridB->addWidget(btnSave,      0, 1);
     gridB->addWidget(btnRead,      1, 0);
     gridB->addWidget(btnWrite,     1, 1);
-    gridB->addWidget(chkAsciiSwap, 2, 1);
+    gridB->addWidget(chkAsciiSwap, 2, 0, 1, 2);
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
 

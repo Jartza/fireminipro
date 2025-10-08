@@ -1,13 +1,12 @@
 #include "HexView.h"
-#include <QFont>
-#include <QString>
-#include <algorithm>
 
 HexView::HexView(QObject *parent) : QAbstractTableModel(parent) {}
 
 void HexView::setBufferRef(QByteArray *buffer) {
     beginResetModel();
     buf_ = buffer;
+    dirty_.resize(buf_ ? buf_->size() : 0);
+    dirty_.fill(false);
     endResetModel();
 }
 
@@ -28,9 +27,15 @@ void HexView::setBytesPerRow(int n) {
 void HexView::setSwapAscii16(bool on) {
     if (asciiSwap16_ == on) return;
     asciiSwap16_ = on;
-    // Only ASCII column changes, but simplest is notify whole model
+
     if (rowCount() > 0) {
-        emit dataChanged(index(0, 0), index(rowCount()-1, columnCount()-1));
+        const int asciiCol = columnCount() - 1;            // last column
+        emit dataChanged(index(0, asciiCol), index(rowCount()-1, asciiCol));
+        emit headerDataChanged(Qt::Horizontal, asciiCol, asciiCol);
+    } else {
+        // still update header even if empty
+        const int asciiCol = columnCount() - 1;
+        emit headerDataChanged(Qt::Horizontal, asciiCol, asciiCol);
     }
 }
 
@@ -53,7 +58,8 @@ QVariant HexView::headerData(int section, Qt::Orientation o, int role) const {
     }
     if (o == Qt::Horizontal && role == Qt::DisplayRole) {
         if (section == 0) return QStringLiteral("Address");
-        if (section == 1 + bytesPerRow_) return QStringLiteral("ASCII");
+        if (section == 1 + bytesPerRow_)
+            return asciiSwap16_ ? QStringLiteral("ASCII (byteswapped)") : QStringLiteral("ASCII");
         return QString("%1").arg(section - 1, 2, 16, QLatin1Char('0')).toUpper();
     }
     if (o == Qt::Vertical && role == Qt::DisplayRole) {
@@ -79,6 +85,21 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
 
     const int col = idx.column();
     const int row = idx.row();
+    const qint64 rowBase = static_cast<qint64>(row) * bytesPerRow_;
+
+    // highlight dirty cells
+    if (role == Qt::BackgroundRole) {
+        // hex cell?
+        if (col > 0 && col < 1 + bytesPerRow_) {
+            const qint64 off = rowBase + (col - 1);
+            if (isDirty(off)) return QBrush(QColor(255, 245, 200)); // soft amber
+        }
+        // ASCII column: highlight if *any* byte in row is dirty (or choose per-byte highlighting if you prefer)
+        if (col == 1 + bytesPerRow_) {
+            for (int i = 0; i < bytesPerRow_; ++i)
+                if (isDirty(rowBase + i)) return QBrush(QColor(255, 245, 200));
+        }
+    }
 
     // monospace + centered hex cells
     if (role == Qt::FontRole) {
@@ -91,8 +112,6 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
     }
 
     if (role != Qt::DisplayRole && role != Qt::EditRole) return {};
-
-    const qint64 rowBase = static_cast<qint64>(row) * bytesPerRow_;
 
     // Address column
     if (col == 0) {
@@ -139,7 +158,7 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
 Qt::ItemFlags HexView::flags(const QModelIndex &idx) const {
     if (!idx.isValid()) return Qt::NoItemFlags;
     auto f = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
-    // only hex byte cells are editable (not address or ASCII)
+    // only hex byte cells are editable
     if (idx.column() > 0 && idx.column() < 1 + bytesPerRow_ && buf_) {
         f |= Qt::ItemIsEditable;
     }
@@ -149,38 +168,25 @@ Qt::ItemFlags HexView::flags(const QModelIndex &idx) const {
 bool HexView::setData(const QModelIndex &idx, const QVariant &val, int role) {
     if (role != Qt::EditRole || !idx.isValid() || !buf_) return false;
     const int col = idx.column();
-    if (col <= 0 || col >= 1 + bytesPerRow_) return false; // don't edit address/ascii
+    if (col <= 0 || col >= 1 + bytesPerRow_) return false;
 
     bool ok = false;
-    const QString s = val.toString().trimmed();
-    if (s.size() == 0) return false;
-
-    // accept "AA" or "0xAA"
-    QString t = s.startsWith("0x", Qt::CaseInsensitive) ? s.mid(2) : s;
-    if (t.size() > 2) return false;
-    const uint v = t.toUInt(&ok, 16);
+    QString t = val.toString().trimmed();
+    if (t.startsWith("0x", Qt::CaseInsensitive)) t = t.mid(2);
+    if (t.size() == 0 || t.size() > 2) return false;
+    uint v = t.toUInt(&ok, 16);
     if (!ok || v > 0xFF) return false;
 
-    const int row = idx.row();
-    const int byteIndexInRow = col - 1;
-    const qint64 off = static_cast<qint64>(row) * bytesPerRow_ + byteIndexInRow;
+    const qint64 off = qint64(idx.row()) * bytesPerRow_ + (col - 1);
     if (!inRange(off)) return false;
 
-    (*buf_)[off] = static_cast<char>(v);
+    (*buf_)[off] = char(v);
+    if (off < dirty_.size()) dirty_.setBit(int(off), true);
 
-    // notify this cell + ASCII column for the row
-    emit dataChanged(idx, idx);
+    emit dataChanged(idx, idx); // hex cell
     const int asciiCol = 1 + bytesPerRow_;
-    emit dataChanged(index(row, asciiCol), index(row, asciiCol));
+    emit dataChanged(index(idx.row(), asciiCol), index(idx.row(), asciiCol)); // ASCII refresh
     return true;
-}
-
-void HexView::setBufferRef(QByteArray *buffer) {
-    beginResetModel();
-    buf_ = buffer;
-    dirty_.resize(buf_ ? buf_->size() : 0);
-    dirty_.fill(false);
-    endResetModel();
 }
 
 void HexView::clearDirty() {
