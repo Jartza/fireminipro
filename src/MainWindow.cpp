@@ -40,7 +40,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
     setWindowTitle("fireminipro");
-    resize(1000, 600);
+    resize(1000, 760);
 
     // left column
     auto *leftBox = new QWidget(central);
@@ -134,6 +134,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     legendTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     legendTable->setSelectionMode(QAbstractItemView::NoSelection);
     legendTable->setFocusPolicy(Qt::NoFocus);
+    legendTable->setMinimumHeight(152);
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);

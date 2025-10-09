@@ -95,7 +95,7 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
     if (role == Qt::DisplayRole) {
         // address
         if (c == 0) {
-            return QString("0x%1").arg(QString::number(qulonglong(rowBase), 16).toUpper());
+            return QString("%1").arg(rowBase, 8, 16, QLatin1Char('0')).toUpper();
         }
 
         // hex bytes
