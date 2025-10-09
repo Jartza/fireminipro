@@ -537,7 +537,10 @@ void MainWindow::loadAtOffsetDialog() {
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Load at offset"));
-    auto *form = new QFormLayout(&dlg);
+    auto *grid = new QGridLayout(&dlg);
+    auto *leftForm = new QFormLayout();
+    auto *rightBox = new QVBoxLayout();
+    rightBox->setSpacing(6);
 
     // Show selected file name (no path) at the top for user context
     const QString baseName = QFileInfo(path).fileName();
@@ -549,7 +552,6 @@ void MainWindow::loadAtOffsetDialog() {
         bf.setBold(true);
         lblFile->setFont(bf);
     }
-    form->addRow(tr("File:"), lblFile);
 
     // Default offset = end of current buffer
     auto *editOff = new QLineEdit(&dlg);
@@ -558,11 +560,9 @@ void MainWindow::loadAtOffsetDialog() {
         const QString hx = QString::number(defOff, 16).toUpper();
         editOff->setText(QString("0x") + hx);
     }
-
     // Default length = whole file
     auto *editLen = new QLineEdit(&dlg);
     editLen->setText(QString("0x%1").arg(QString::number(fileSize, 16).toUpper()));
-
     auto *editPad = new QLineEdit(&dlg);
     editPad->setText("0xFF");
 
@@ -570,63 +570,68 @@ void MainWindow::loadAtOffsetDialog() {
     auto *lblOffInfo = new QLabel(&dlg);
     auto *lblLenInfo = new QLabel(&dlg);
     auto *lblEndInfo = new QLabel(&dlg);
+    lblOffInfo->setWordWrap(true);
+    lblLenInfo->setWordWrap(true);
+    lblEndInfo->setWordWrap(true);
 
     // Preview widget
     auto *preview = new LoadPreviewBar(&dlg);
 
-    // --- Add warning label and keep handle to OK button ---
-    // (We'll create the button box and warning label before the lambda.)
+    // --- Layout: add widgets to leftForm and rightBox as described ---
+    leftForm->addRow(tr("File:"), lblFile);
+    leftForm->addRow(tr("Offset:"), editOff);
+    leftForm->addRow(tr("Length:"), editLen);
+    leftForm->addRow(tr("Pad byte:"), editPad);
+
+    rightBox->addWidget(lblOffInfo);
+    rightBox->addWidget(lblLenInfo);
+    rightBox->addWidget(lblEndInfo);
+    rightBox->addStretch();
+
+    grid->addLayout(leftForm, 0, 0);
+    grid->addLayout(rightBox, 0, 1);
+    grid->addWidget(preview, 1, 0, 1, 2);
+
     auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
-    auto *okBtn  = bb->button(QDialogButtonBox::Ok);
-    okBtn->setEnabled(false); // We'll enable based on field validity in updateInfo
+    auto *okBtn = bb->button(QDialogButtonBox::Ok);
+    okBtn->setEnabled(false);
+    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+    grid->addWidget(bb, 2, 0, 1, 2);
 
     auto updateInfo = [this, editOff, editLen, editPad, lblOffInfo, lblLenInfo, lblEndInfo, fileSize, okBtn, preview]() {
         qulonglong off=0, lenReq=0, padTmp=0xFF;
         const bool offOk = parseSizeLike(editOff->text(), off);
         bool lenOk = parseSizeLike(editLen->text(), lenReq);
         const bool padOk = parseSizeLike(editPad->text(), padTmp) && padTmp <= 0xFF;
-        if (!lenOk) lenReq = 0; // show invalid gracefully
-
-        // For preview, use requested length if provided (>0); if empty/invalid, preview whole file
+        if (!lenOk) lenReq = 0;
         const bool haveLen = (lenOk && lenReq > 0);
         const qulonglong effLen = haveLen ? lenReq : fileSize;
-
         // Offset info
         if (offOk) {
-            lblOffInfo->setText(QString("Offset = 0x%1  (%2)")
+            lblOffInfo->setText(QString("Offset: 0x%1 (%2)")
                                 .arg(QString::number(off, 16).toUpper())
                                 .arg(QLocale().toString(off)));
         } else {
             lblOffInfo->setText(tr("Invalid offset"));
         }
-
         // Length + File info (multi-line)
         if (haveLen) {
-            if (lenReq > fileSize) {
-                const qulonglong padCount = lenReq - fileSize;
-                lblLenInfo->setText(QString("LENGTH = 0x%1 (%2)\nFILE = 0x%3 (%4)")
-                                    .arg(QString::number(lenReq, 16).toUpper())
-                                    .arg(QLocale().toString(lenReq))
-                                    .arg(QString::number(fileSize, 16).toUpper())
-                                    .arg(QLocale().toString(fileSize)));
-            } else {
-                lblLenInfo->setText(QString("LENGTH = 0x%1 (%2)\nFILE = 0x%3 (%4)")
-                                    .arg(QString::number(lenReq, 16).toUpper())
-                                    .arg(QLocale().toString(lenReq))
-                                    .arg(QString::number(fileSize, 16).toUpper())
-                                    .arg(QLocale().toString(fileSize)));
-            }
+            lblLenInfo->setText(QString("Length: 0x%1 (%2)\nFile size: 0x%3 (%4)")
+                                .arg(QString::number(lenReq, 16).toUpper())
+                                .arg(QLocale().toString(lenReq))
+                                .arg(QString::number(fileSize, 16).toUpper())
+                                .arg(QLocale().toString(fileSize)));
         } else {
-            lblLenInfo->setText(QString("LENGTH = (whole file)\nFILE = 0x%1 (%2)")
+            lblLenInfo->setText(QString("Length: whole file\nFile size: 0x%1 (%2)")
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         }
-
         // End address / new buffer size (use effLen)
         if (offOk && effLen > 0) {
             const qulonglong endAddr = off + effLen - 1;
             const qulonglong newSizeIfAppend = std::max<qulonglong>(buffer_.size(), off + effLen);
-            lblEndInfo->setText(QString("END ADDR = 0x%1 (%2)\nNEW BUFFER SIZE = 0x%3 (%4)")
+            lblEndInfo->setText(QString("End address: 0x%1 (%2)\nNew buffer size: 0x%3 (%4)")
                                 .arg(QString::number(endAddr, 16).toUpper())
                                 .arg(QLocale().toString(endAddr))
                                 .arg(QString::number(newSizeIfAppend, 16).toUpper())
@@ -634,33 +639,18 @@ void MainWindow::loadAtOffsetDialog() {
         } else {
             lblEndInfo->clear();
         }
-
         // Calculate preview parts: file portion (green) and post-data padding (yellow)
         const qulonglong filePart = haveLen ? std::min<qulonglong>(lenReq, fileSize) : fileSize;
         const qulonglong postPad  = (haveLen && lenReq > fileSize) ? (lenReq - fileSize) : 0;
         const bool prePadNeeded = offOk && (off > static_cast<qulonglong>(buffer_.size()));
         editPad->setEnabled(postPad > 0 || prePadNeeded);
         preview->setParams(static_cast<qulonglong>(buffer_.size()), offOk ? off : 0, filePart, postPad);
-
-        // Enable OK when we have a valid offset, a positive effective length, and a valid pad
         okBtn->setEnabled(offOk && (effLen > 0) && padOk);
     };
 
     QObject::connect(editOff, &QLineEdit::textChanged, &dlg, updateInfo);
     QObject::connect(editLen, &QLineEdit::textChanged, &dlg, updateInfo);
     QObject::connect(editPad, &QLineEdit::textChanged, &dlg, updateInfo);
-
-    form->addRow(tr("Offset:"), editOff);
-    form->addRow(QString(), lblOffInfo);
-    form->addRow(tr("Length:"), editLen);
-    form->addRow(QString(), lblLenInfo);
-
-    form->addRow(tr("Pad:"),    editPad);
-    form->addRow(QString(), lblEndInfo);
-    form->addRow(tr("Preview:"), preview);
-    form->addRow(bb);
-    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
-    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
     updateInfo();
     if (dlg.exec() != QDialog::Accepted) return;
