@@ -64,10 +64,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Buffer group
     auto *groupBuffer = new QGroupBox("Buffer", leftBox);
     auto *gridB  = new QGridLayout(groupBuffer);
-    btnLoad      = new QPushButton("Clear && Load…", groupBuffer);
-    btnSave      = new QPushButton("Save", groupBuffer);
-    btnRead      = new QPushButton("Read",  groupBuffer);
-    btnWrite     = new QPushButton("Write", groupBuffer);
+    btnClear     = new QPushButton("Clear buffer", groupBuffer);
+    btnSave      = new QPushButton("Save buffer", groupBuffer);
+    btnRead      = new QPushButton("Read target",  groupBuffer);
+    btnWrite     = new QPushButton("Write target", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
 
     // layout (Buffer)
@@ -79,18 +79,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     //  Row 4: Modified: ...             (spans 2 cols)
 
     // ensure extra actions and labels exist
-    btnLoadAt    = new QPushButton("Load at offset…", groupBuffer);
+    btnLoad    = new QPushButton("Load binary to buffer", groupBuffer);
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
-    if (!lblBufDirty) lblBufDirty = new QLabel("Modified: 0",   groupBuffer);
 
     gridB->addWidget(btnLoad,      0, 0, 1, 2);
-    gridB->addWidget(btnLoadAt,    1, 0, 1, 1);
+    gridB->addWidget(btnClear,    1, 0, 1, 1);
     gridB->addWidget(btnSave,      1, 1, 1, 1);
     gridB->addWidget(btnRead,      2, 0, 1, 1);
     gridB->addWidget(btnWrite,     2, 1, 1, 1);
     gridB->addWidget(chkAsciiSwap, 3, 0, 1, 2);
     gridB->addWidget(lblBufSize,   4, 0, 1, 2);
-    gridB->addWidget(lblBufDirty,  5, 0, 1, 2);
 
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
@@ -196,19 +194,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     });
 
     // button wiring
-    connect(btnLoad, &QPushButton::clicked, this, [this]{
+    connect(btnClear, &QPushButton::clicked, this, [this]{
         buffer_.clear();
         gSegments.clear();
         updateLegendTable(this, gSegments);
         if (hexModel) hexModel->setBufferRef(&buffer_);
-        if (lblBufDirty) lblBufDirty->setText("Modified: 0");
         if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
-        loadBufferFromFile();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
     connect(btnRead,  &QPushButton::clicked, this, &MainWindow::readFromDevice);
     connect(btnWrite, &QPushButton::clicked, this, &MainWindow::writeToDevice);
-    connect(btnLoadAt, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
+    connect(btnLoad, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
     connect(comboDevice, &QComboBox::currentTextChanged,
         this, [this](const QString&){ updateActionEnabling(); });
 
@@ -219,7 +215,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
 void MainWindow::setUiEnabled(bool on) {
     for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice, btnRescan,
-                                         btnLoad, btnSave, btnRead, btnWrite})
+                                         btnClear, btnSave, btnRead, btnWrite})
         if (w) w->setEnabled(on);
 }
 
@@ -275,8 +271,6 @@ void MainWindow::loadBufferFromFile() {
         lblBufSize->setText(QString("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
-    if (lblBufDirty && hexModel)
-        lblBufDirty->setText(QString("Modified: %1").arg(hexModel->dirtyCount()));
 }
 
 void MainWindow::saveBufferToFile() {
@@ -537,7 +531,7 @@ void MainWindow::loadAtOffsetDialog() {
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Load at offset"));
-    dlg.setMinimumSize(620, 420);          // give headroom for large numbers
+    dlg.setMinimumSize(560, 280);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
     auto *grid = new QGridLayout(&dlg);
     auto *leftForm = new QFormLayout();
@@ -695,8 +689,6 @@ void MainWindow::loadAtOffsetDialog() {
         lblBufSize->setText(QString("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
-    if (lblBufDirty && hexModel)
-        lblBufDirty->setText(QString("Modified: %1").arg(hexModel->dirtyCount()));
 
     updateActionEnabling();
 }

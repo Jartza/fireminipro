@@ -39,14 +39,13 @@ private:
     QPushButton *btnRescan{};
 
     // buffer group
-    QPushButton *btnLoad{};     // Clear & Load
-    QPushButton *btnLoadAt{};   // Load at offset
+    QPushButton *btnClear{};
+    QPushButton *btnLoad{};
     QPushButton *btnSave{};
     QPushButton *btnRead{};
     QPushButton *btnWrite{};
     QCheckBox   *chkAsciiSwap{};
     QLabel      *lblBufSize{};
-    QLabel      *lblBufDirty{};
 
     // eeprom options
     QCheckBox *chkBlankCheck{};
