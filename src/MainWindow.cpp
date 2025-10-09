@@ -394,13 +394,13 @@ void MainWindow::patchBuffer(int offset, const QByteArray &data, char padByte) {
 class LoadPreviewBar : public QWidget {
 public:
     explicit LoadPreviewBar(QWidget *parent=nullptr) : QWidget(parent) {
-        setMinimumHeight(70);
+        setMinimumHeight(88);
     }
     void setParams(qulonglong bufSize, qulonglong off, qulonglong dataLen, qulonglong padLen) {
         bufSize_ = bufSize; off_ = off; dataLen_ = dataLen; padLen_ = padLen; update();
     }
 protected:
-    QSize sizeHint() const override { return QSize(380, 74); }
+    QSize sizeHint() const override { return QSize(420, 92); }
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing, false);
@@ -537,10 +537,12 @@ void MainWindow::loadAtOffsetDialog() {
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Load at offset"));
+    dlg.setMinimumSize(620, 420);          // give headroom for large numbers
+    dlg.setSizeGripEnabled(true);          // user can grow the dialog
     auto *grid = new QGridLayout(&dlg);
     auto *leftForm = new QFormLayout();
-    auto *rightBox = new QVBoxLayout();
-    rightBox->setSpacing(6);
+    auto *infoGroup = new QGroupBox(tr("Info"), &dlg);
+    auto *infoLayout = new QVBoxLayout(infoGroup);
 
     // Show selected file name (no path) at the top for user context
     const QString baseName = QFileInfo(path).fileName();
@@ -570,27 +572,31 @@ void MainWindow::loadAtOffsetDialog() {
     auto *lblOffInfo = new QLabel(&dlg);
     auto *lblLenInfo = new QLabel(&dlg);
     auto *lblEndInfo = new QLabel(&dlg);
-    lblOffInfo->setWordWrap(true);
-    lblLenInfo->setWordWrap(true);
-    lblEndInfo->setWordWrap(true);
+    for (QLabel* L : {lblOffInfo, lblLenInfo, lblEndInfo}) {
+        L->setWordWrap(true);
+        L->setTextFormat(Qt::RichText);   // allow <b> headings
+        QPalette pal = L->palette();
+        pal.setColor(QPalette::WindowText, Qt::black);
+        L->setPalette(pal);
+        infoLayout->addWidget(L);
+    }
 
     // Preview widget
     auto *preview = new LoadPreviewBar(&dlg);
 
-    // --- Layout: add widgets to leftForm and rightBox as described ---
+    // --- Layout: add widgets to left (inputs) and right (info box) ---
     leftForm->addRow(tr("File:"), lblFile);
     leftForm->addRow(tr("Offset:"), editOff);
     leftForm->addRow(tr("Length:"), editLen);
     leftForm->addRow(tr("Pad byte:"), editPad);
 
-    rightBox->addWidget(lblOffInfo);
-    rightBox->addWidget(lblLenInfo);
-    rightBox->addWidget(lblEndInfo);
-    rightBox->addStretch();
-
     grid->addLayout(leftForm, 0, 0);
-    grid->addLayout(rightBox, 0, 1);
+    grid->addWidget(infoGroup, 0, 1);
     grid->addWidget(preview, 1, 0, 1, 2);
+
+    // make columns feel balanced
+    grid->setColumnStretch(0, 2);
+    grid->setColumnStretch(1, 3);
 
     auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
     auto *okBtn = bb->button(QDialogButtonBox::Ok);
@@ -607,31 +613,31 @@ void MainWindow::loadAtOffsetDialog() {
         if (!lenOk) lenReq = 0;
         const bool haveLen = (lenOk && lenReq > 0);
         const qulonglong effLen = haveLen ? lenReq : fileSize;
-        // Offset info
+        // Offset info (bold heading)
         if (offOk) {
-            lblOffInfo->setText(QString("Offset: 0x%1 (%2)")
+            lblOffInfo->setText(QString("<b>Offset:</b> 0x%1 (%2)")
                                 .arg(QString::number(off, 16).toUpper())
                                 .arg(QLocale().toString(off)));
         } else {
-            lblOffInfo->setText(tr("Invalid offset"));
+            lblOffInfo->setText(QString("<b>Offset:</b> <span style='color:#c00'>invalid</span>"));
         }
-        // Length + File info (multi-line)
+        // Length + File info (bold headings, multiline)
         if (haveLen) {
-            lblLenInfo->setText(QString("Length: 0x%1 (%2)\nFile size: 0x%3 (%4)")
+            lblLenInfo->setText(QString("<b>Length:</b> 0x%1 (%2)<br/><b>File size:</b> 0x%3 (%4)")
                                 .arg(QString::number(lenReq, 16).toUpper())
                                 .arg(QLocale().toString(lenReq))
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         } else {
-            lblLenInfo->setText(QString("Length: whole file\nFile size: 0x%1 (%2)")
+            lblLenInfo->setText(QString("<b>Length:</b> whole file<br/><b>File size:</b> 0x%1 (%2)")
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         }
-        // End address / new buffer size (use effLen)
+        // End address / new buffer size (bold headings, multiline)
         if (offOk && effLen > 0) {
             const qulonglong endAddr = off + effLen - 1;
             const qulonglong newSizeIfAppend = std::max<qulonglong>(buffer_.size(), off + effLen);
-            lblEndInfo->setText(QString("End address: 0x%1 (%2)\nNew buffer size: 0x%3 (%4)")
+            lblEndInfo->setText(QString("<b>End address:</b> 0x%1 (%2)<br/><b>New buffer size:</b> 0x%3 (%4)")
                                 .arg(QString::number(endAddr, 16).toUpper())
                                 .arg(QLocale().toString(endAddr))
                                 .arg(QString::number(newSizeIfAppend, 16).toUpper())
