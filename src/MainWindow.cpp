@@ -200,6 +200,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         updateLegendTable(this, gSegments);
         if (hexModel) hexModel->setBufferRef(&buffer_);
         if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
+        updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
     connect(btnRead,  &QPushButton::clicked, this, &MainWindow::readFromDevice);
