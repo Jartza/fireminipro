@@ -29,9 +29,12 @@
 #include "MainWindow.h"
 #include "HexView.h"
 
-
-// --- Buffer segment legend ---
-struct BufferSegment { qulonglong start{}, length{}; QString label; };
+struct BufferSegment {
+    qulonglong start{};
+    qulonglong length{};
+    QString    label;   // filename
+    QString    note;    // "", " (partial)", " (overlap)"
+};
 static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
 static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
 static QList<BufferSegment> gSegments; // simple per-process storage
@@ -709,11 +712,15 @@ static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs)
     legendTable->setRowCount(segs.size());
     int row = 0;
     for (const auto &s : segs) {
-        const qulonglong end = (s.length ? (s.start + s.length - 1) : s.start);
+        const qulonglong end = s.length ? (s.start + s.length - 1) : s.start;
         auto *itStart = new QTableWidgetItem(QString("0x") + QString::number(s.start, 16));
-        auto *itEnd   = new QTableWidgetItem(QString("0x") + QString::number(end, 16));
-        auto *itSize  = new QTableWidgetItem(QString::number(s.length) + QString(" (0x") + QString::number(s.length, 16) + ")");
-        auto *itLabel = new QTableWidgetItem(s.label);
+        auto *itEnd   = new QTableWidgetItem(QString("0x") + QString::number(end,   16));
+        auto *itSize  = new QTableWidgetItem(QString("%1 (0x%2)")
+                                             .arg(QString::number(s.length))
+                                             .arg(QString::number(s.length, 16)));
+        QString label = s.label;
+        if (!s.note.isEmpty()) label += s.note;   // append " (partial)" or " (overlap)"
+        auto *itLabel = new QTableWidgetItem(label);
         legendTable->setItem(row, 0, itStart);
         legendTable->setItem(row, 1, itEnd);
         legendTable->setItem(row, 2, itSize);
@@ -724,8 +731,70 @@ static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs)
 }
 
 static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label) {
-    // Merge/simple append (no coalescing yet)
-    gSegments.append(BufferSegment{start, length, label});
-    std::sort(gSegments.begin(), gSegments.end(), [](const BufferSegment &a, const BufferSegment &b){ return a.start < b.start; });
+    const qulonglong nBeg = start;
+    const qulonglong nEnd = start + length; // half-open
+
+    QList<BufferSegment> out;
+    out.reserve(gSegments.size() + 1);
+
+    bool anyPartialOverlap = false; // becomes true only if an overlapped old segment has a remainder (left or right)
+
+    for (const auto &seg : std::as_const(gSegments)) {
+        const qulonglong sBeg = seg.start;
+        const qulonglong sEnd = seg.start + seg.length; // half-open
+
+        // No overlap -> keep as-is
+        if (sEnd <= nBeg || nEnd <= sBeg) {
+            out.append(seg);
+            continue;
+        }
+
+        // There is some overlap. Decide if it's partial (i.e., any remainder exists).
+        const bool hasLeftRemainder  = (sBeg < nBeg);
+        const bool hasRightRemainder = (nEnd < sEnd);
+        if (hasLeftRemainder || hasRightRemainder) {
+            anyPartialOverlap = true;
+        }
+
+        // Left remainder [sBeg, nBeg)
+        if (hasLeftRemainder) {
+            BufferSegment left{ sBeg, nBeg - sBeg, seg.label, QStringLiteral(" (partial)") };
+            out.append(left);
+        }
+
+        // Middle [max(sBeg,nBeg), min(sEnd,nEnd)) is fully covered by the new segment -> drop
+
+        // Right remainder [nEnd, sEnd)
+        if (hasRightRemainder) {
+            BufferSegment right{ nEnd, sEnd - nEnd, seg.label, QStringLiteral(" (partial)") };
+            out.append(right);
+        }
+    }
+
+    // Add the new segment; mark as overlap only when the overlap was partial (not exact full cover)
+    BufferSegment added{ nBeg, length, label, anyPartialOverlap ? QStringLiteral(" (overlap)") : QString() };
+    out.append(added);
+
+    // Sort by start
+    std::sort(out.begin(), out.end(), [](const BufferSegment &a, const BufferSegment &b){
+        return a.start < b.start;
+    });
+
+    // Coalesce adjacent entries that share the same label+note and are contiguous
+    QList<BufferSegment> coalesced;
+    for (const auto &s : std::as_const(out)) {
+        if (!coalesced.isEmpty()) {
+            auto &back = coalesced.last();
+            const bool sameTag = (back.label == s.label) && (back.note == s.note);
+            const bool contiguous = (back.start + back.length == s.start);
+            if (sameTag && contiguous) {
+                back.length += s.length;
+                continue;
+            }
+        }
+        coalesced.append(s);
+    }
+
+    gSegments = std::move(coalesced);
     updateLegendTable(parent, gSegments);
 }
