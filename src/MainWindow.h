@@ -1,13 +1,20 @@
 #pragma once
+
 #include <QMainWindow>
+#include <QByteArray>
+#include <QStringList>
 #include <QProcess>
 
 class QComboBox;
 class QPushButton;
 class QTableView;
 class QPlainTextEdit;
-class QSplitter;
 class QCheckBox;
+class QLabel;
+class QProcess;
+class QWidget;
+
+// Forward-declare HexView to avoid circular includes in headers
 class HexView;
 
 class MainWindow : public QMainWindow {
@@ -23,22 +30,23 @@ private slots:
     void writeToDevice();
     void handleProcessOutput();
     void handleProcessFinished(int exitCode, QProcess::ExitStatus status);
-
-private:
-    HexView *hexModel{};        // model
-    QCheckBox *chkAsciiSwap{};  // toggle (put in your options group)
+    void loadAtOffsetDialog();
 
 private:
     // left/targets
-    QComboBox *comboProgrammer{};
-    QComboBox *comboDevice{};
+    QComboBox   *comboProgrammer{};
+    QComboBox   *comboDevice{};
     QPushButton *btnRescan{};
 
     // buffer group
-    QPushButton *btnLoad{};
+    QPushButton *btnLoad{};     // Clear & Load
+    QPushButton *btnLoadAt{};   // Load at offset
     QPushButton *btnSave{};
     QPushButton *btnRead{};
     QPushButton *btnWrite{};
+    QCheckBox   *chkAsciiSwap{};
+    QLabel      *lblBufSize{};
+    QLabel      *lblBufDirty{};
 
     // eeprom options
     QCheckBox *chkBlankCheck{};
@@ -51,16 +59,26 @@ private:
     QCheckBox *chkHardwareCheck{};
 
     // views
-    QTableView *tableHex{};
+    QTableView     *tableHex{};
     QPlainTextEdit *log{};
 
     // process
     QProcess *process{};
 
-    // simple in-memory buffer (replace with your HexView backing later)
+    // hex model
+    HexView *hexModel{};
+
+    // in-memory buffer
     QByteArray buffer_;
     QString    lastPath_;
 
-    QStringList optionFlags() const; // build flags from checkboxes
+    // helpers
+    QStringList optionFlags() const;
     void setUiEnabled(bool on);
+    void updateActionEnabling();
+
+    // parsing / buffer helpers
+    bool parseSizeLike(const QString &in, qulonglong &out);
+    void ensureBufferSize(int newSize, char padByte);
+    void patchBuffer(int offset, const QByteArray &data, char padByte);
 };

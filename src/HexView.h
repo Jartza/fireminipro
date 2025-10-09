@@ -1,45 +1,40 @@
 #pragma once
-#include <QFont>
-#include <QString>
+
 #include <QAbstractTableModel>
 #include <QByteArray>
-#include <QBitArray>
-#include <QBrush>
-#include <QColor>
-#include <algorithm>
+#include <QSet>
 
 class HexView : public QAbstractTableModel {
     Q_OBJECT
 public:
     explicit HexView(QObject *parent = nullptr);
 
-    // external buffer management
-    void setBufferRef(QByteArray *buffer);        // points to an external QByteArray
-    void clear();                                 // clears view (does not clear external buffer)
-    void setBytesPerRow(int n);                   // default 16
-    void setSwapAscii16(bool on);                 // display only
-    void clearDirty();
-    bool isDirty(qint64 offset) const;
-    int  dirtyCount() const;
+    void setBufferRef(QByteArray *buffer);
+    void clear();
+
+    void setBytesPerRow(int n);
+    int  getBytesPerRow() const { return bytesPerRow_; }
+
+    void setSwapAscii16(bool on);
 
     // QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-    QVariant data(const QModelIndex &index, int role) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-    Qt::ItemFlags flags(const QModelIndex &index) const override;
-    bool setData(const QModelIndex &index, const QVariant &value, int role) override;
+    QVariant headerData(int section, Qt::Orientation o, int role) const override;
+    QVariant data(const QModelIndex &idx, int role) const override;
+    Qt::ItemFlags flags(const QModelIndex &idx) const override;
+    bool setData(const QModelIndex &idx, const QVariant &val, int role) override;
 
-    // convenience
-    static bool isPrintable(uint8_t b);
+    // dirty tracking
+    void clearDirty();
+    bool isDirty(qint64 off) const;
+    int  dirtyCount() const;
 
 private:
-    QByteArray *buf_ = nullptr;   // not owned
-    QBitArray dirty_; // one flag bit per byte in buf_, for tracking edits
-    int bytesPerRow_ = 16;
-    bool asciiSwap16_ = false;
+    static bool isPrintable(uint8_t b);
 
-    inline bool inRange(qint64 offset) const {
-        return buf_ && offset >= 0 && offset < buf_->size();
-    }
+    QByteArray *buffer_{};    // not owned
+    int         bytesPerRow_{16};
+    bool        swapAscii16_{false};
+    QSet<qint64> dirty_;
 };

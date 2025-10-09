@@ -15,8 +15,26 @@
 #include <QHeaderView>
 #include <QFont>
 #include <QHeaderView>
-#include "HexView.h"
+#include <QLabel>
+#include <QDialog>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QLineEdit>
+#include <QLocale>
+#include <QPainter>
+#include <QTableWidget>
+#include <QHeaderView>
+#include <algorithm>
+
 #include "MainWindow.h"
+#include "HexView.h"
+
+
+// --- Buffer segment legend ---
+struct BufferSegment { qulonglong start{}, length{}; QString label; };
+static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
+static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
+static QList<BufferSegment> gSegments; // simple per-process storage
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
@@ -43,18 +61,34 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Buffer group
     auto *groupBuffer = new QGroupBox("Buffer", leftBox);
     auto *gridB  = new QGridLayout(groupBuffer);
-    btnLoad      = new QPushButton("Load", groupBuffer);
+    btnLoad      = new QPushButton("Clear && Load…", groupBuffer);
     btnSave      = new QPushButton("Save", groupBuffer);
     btnRead      = new QPushButton("Read",  groupBuffer);
     btnWrite     = new QPushButton("Write", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
 
-    // layout
-    gridB->addWidget(btnLoad,      0, 0);
-    gridB->addWidget(btnSave,      0, 1);
-    gridB->addWidget(btnRead,      1, 0);
-    gridB->addWidget(btnWrite,     1, 1);
-    gridB->addWidget(chkAsciiSwap, 2, 0, 1, 2);
+    // layout (Buffer)
+    // Desired order:
+    //  Row 0: Clear & Load…  (spans 2 cols)
+    //  Row 1: Load at offset… (left)   | Save (right)
+    //  Row 2: ASCII byteswap (16-bit)  (spans 2 cols)
+    //  Row 3: Size: ...                 (spans 2 cols)
+    //  Row 4: Modified: ...             (spans 2 cols)
+
+    // ensure extra actions and labels exist
+    btnLoadAt    = new QPushButton("Load at offset…", groupBuffer);
+    if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
+    if (!lblBufDirty) lblBufDirty = new QLabel("Modified: 0",   groupBuffer);
+
+    gridB->addWidget(btnLoad,      0, 0, 1, 2);
+    gridB->addWidget(btnLoadAt,    1, 0, 1, 1);
+    gridB->addWidget(btnSave,      1, 1, 1, 1);
+    gridB->addWidget(btnRead,      2, 0, 1, 1);
+    gridB->addWidget(btnWrite,     2, 1, 1, 1);
+    gridB->addWidget(chkAsciiSwap, 3, 0, 1, 2);
+    gridB->addWidget(lblBufSize,   4, 0, 1, 2);
+    gridB->addWidget(lblBufDirty,  5, 0, 1, 2);
+
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
 
@@ -84,19 +118,36 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addWidget(groupOpts);
     leftLayout->addStretch();
 
-    // right side (hex + log)
+    // right side (hex + legend + log)
     auto *rightSplitter = new QSplitter(Qt::Vertical, central);
     tableHex = new QTableView(rightSplitter);
+
+    // Buffer legend table
+    auto *legendTable = new QTableWidget(rightSplitter);
+    legendTable->setObjectName("bufferLegendTable");
+    legendTable->setColumnCount(4);
+    legendTable->setHorizontalHeaderLabels({tr("Start"), tr("End"), tr("Size"), tr("File")});
+    legendTable->horizontalHeader()->setStretchLastSection(true);
+    legendTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    legendTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    legendTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    legendTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    legendTable->setSelectionMode(QAbstractItemView::NoSelection);
+    legendTable->setFocusPolicy(Qt::NoFocus);
+
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
+
     rightSplitter->addWidget(tableHex);
+    rightSplitter->addWidget(legendTable);
     rightSplitter->addWidget(log);
-    rightSplitter->setStretchFactor(0, 3);
-    rightSplitter->setStretchFactor(1, 2);
+    rightSplitter->setStretchFactor(0, 5);
+    rightSplitter->setStretchFactor(1, 1);
+    rightSplitter->setStretchFactor(2, 3);
 
     // Hex view/model
     hexModel = new HexView(this);
-    hexModel->setBytesPerRow(16);
+    // hexModel->setBytesPerRow(16); // Default is 16
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
     QFont mono; mono.setFamily("Courier New"); mono.setStyleHint(QFont::Monospace);
@@ -106,20 +157,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     tableHex->setSelectionBehavior(QAbstractItemView::SelectItems);
     tableHex->verticalHeader()->setDefaultSectionSize(20);
 
-    // header sizing
+    // Hexviewer header sizing
     auto *hh = tableHex->horizontalHeader();
-    hh->setSectionResizeMode(QHeaderView::Fixed);        // default: fixed
-    hh->setStretchLastSection(true);                      // ASCII stretches
+    hh->setSectionResizeMode(QHeaderView::Fixed);
+    hh->setStretchLastSection(true);
 
     // address column (0) to contents
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 
     // set a compact width for all hex byte columns (1..bytesPerRow)
-    const int bytesPerRow = 16;
-    for (int c = 1; c <= bytesPerRow; ++c) tableHex->setColumnWidth(c, 28);  // ~2 hex chars + some padding
+    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, 28);  // ~2 hex chars + some padding
     tableHex->setAlternatingRowColors(true);
     tableHex->verticalHeader()->setDefaultSectionSize(20);
-    tableHex->horizontalHeader()->setStretchLastSection(true); // ASCII column
+    // ASCII column
+    tableHex->horizontalHeader()->setStretchLastSection(true);
 
     auto *split = new QSplitter(Qt::Horizontal, central);
     split->addWidget(leftBox);
@@ -136,24 +187,45 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(process, &QProcess::readyReadStandardError,  this, &MainWindow::handleProcessOutput);
     connect(process, QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),
             this, &MainWindow::handleProcessFinished);
-    connect(chkAsciiSwap, &QCheckBox::toggled, hexModel, &HexView::setSwapAscii16);
+    connect(chkAsciiSwap, &QCheckBox::toggled, this, [this](bool on){
+        if (hexModel) hexModel->setSwapAscii16(on);
+    });
 
     // button wiring
-    connect(btnLoad,  &QPushButton::clicked, this, &MainWindow::loadBufferFromFile);
+    connect(btnLoad, &QPushButton::clicked, this, [this]{
+        buffer_.clear();
+        gSegments.clear();
+        updateLegendTable(this, gSegments);
+        if (hexModel) hexModel->setBufferRef(&buffer_);
+        if (lblBufDirty) lblBufDirty->setText("Modified: 0");
+        if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
+        loadBufferFromFile();
+    });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
     connect(btnRead,  &QPushButton::clicked, this, &MainWindow::readFromDevice);
     connect(btnWrite, &QPushButton::clicked, this, &MainWindow::writeToDevice);
+    connect(btnLoadAt, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
+    connect(comboDevice, &QComboBox::currentTextChanged,
+        this, [this](const QString&){ updateActionEnabling(); });
 
     // initial state
     setUiEnabled(true);
-    btnSave->setEnabled(false);
-    btnWrite->setEnabled(false);
+    updateActionEnabling();
 }
 
 void MainWindow::setUiEnabled(bool on) {
     for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice, btnRescan,
                                          btnLoad, btnSave, btnRead, btnWrite})
         if (w) w->setEnabled(on);
+}
+
+void MainWindow::updateActionEnabling() {
+    const bool deviceSelected = !comboDevice->currentText().isEmpty();
+    const bool hasBuffer      = !buffer_.isEmpty();
+
+    if (btnRead)  btnRead->setEnabled(deviceSelected);               // Read needs device
+    if (btnWrite) btnWrite->setEnabled(deviceSelected && hasBuffer); // Write needs device + buffer
+    if (btnSave)  btnSave->setEnabled(hasBuffer);                    // Save needs buffer
 }
 
 QStringList MainWindow::optionFlags() const {
@@ -182,6 +254,10 @@ void MainWindow::loadBufferFromFile() {
     }
     buffer_ = f.readAll();
 
+    // Reset legend to this single file
+    gSegments.clear();
+    addSegmentAndRefresh(this, 0, static_cast<qulonglong>(buffer_.size()), QFileInfo(path).fileName());
+
     // Refresh Hex View
     if (hexModel) {
         hexModel->setBufferRef(&buffer_); // begin/end reset inside ensures view updates
@@ -189,9 +265,14 @@ void MainWindow::loadBufferFromFile() {
 
     lastPath_ = QFileInfo(path).absolutePath();
     log->appendPlainText(QString("[Loaded] %1 bytes from %2").arg(buffer_.size()).arg(path));
-    btnSave->setEnabled(true);
-    btnWrite->setEnabled(!comboDevice->currentText().isEmpty());
-    // TODO: update HexView model from buffer_
+    updateActionEnabling();
+
+    if (lblBufSize)
+        lblBufSize->setText(QString("Size: %1 (0x%2)")
+                            .arg(QLocale().toString(buffer_.size()))
+                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+    if (lblBufDirty && hexModel)
+        lblBufDirty->setText(QString("Modified: %1").arg(hexModel->dirtyCount()));
 }
 
 void MainWindow::saveBufferToFile() {
@@ -245,7 +326,405 @@ void MainWindow::handleProcessOutput() {
 }
 
 void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus) {
-    setUiEnabled(true);
+    updateActionEnabling();
     log->appendPlainText(QString("[Done] exit=%1").arg(exitCode));
     // You might decide to auto-load read file into buffer_ here
+}
+
+// --- helpers ---------------------------------------------------------------
+
+// parse sizes like "0x1F000", "8192", "32k", "512K", "1M", "256KB", "2MB"
+bool MainWindow::parseSizeLike(const QString &in, qulonglong &out) {
+    QString s = in.trimmed();
+    if (s.isEmpty()) return false;
+
+    qulonglong mul = 1;
+    if (s.endsWith("KB", Qt::CaseInsensitive)) { mul = 1024ULL; s.chop(2); }
+    else if (s.endsWith("MB", Qt::CaseInsensitive)) { mul = 1024ULL*1024ULL; s.chop(2); }
+    else if (!s.isEmpty() && (s.back() == QLatin1Char('k') || s.back() == QLatin1Char('K'))) { mul = 1024ULL; s.chop(1); }
+    else if (!s.isEmpty() && (s.back() == QLatin1Char('m') || s.back() == QLatin1Char('M'))) { mul = 1024ULL*1024ULL; s.chop(1); }
+
+    bool ok = false;
+    qulonglong base = 0;
+    s = s.trimmed();
+    if (s.startsWith("0x", Qt::CaseInsensitive)) {
+        base = s.mid(2).toULongLong(&ok, 16);
+    } else {
+        base = s.toULongLong(&ok, 10);
+    }
+    if (!ok) return false;
+    out = base * mul;
+    return true;
+}
+
+void MainWindow::ensureBufferSize(int newSize, char padByte) {
+    if (newSize <= buffer_.size()) return;
+    const int growBy = newSize - buffer_.size();
+    buffer_.append(QByteArray(growBy, padByte));
+}
+
+void MainWindow::patchBuffer(int offset, const QByteArray &data, char padByte) {
+    if (offset < 0 || data.isEmpty()) return;
+    const int oldSize = buffer_.size();
+    const int end = offset + data.size();
+    ensureBufferSize(end, padByte);
+    const bool grew = buffer_.size() > oldSize;
+
+    std::copy(data.begin(), data.end(), buffer_.begin() + offset);
+
+    if (hexModel) {
+        if (grew) {
+            // Row count changed; reset model so the view reflects new size
+            hexModel->setBufferRef(&buffer_);
+        } else {
+            const int bpr = std::max(1, hexModel->getBytesPerRow());
+            const int firstRow = offset / bpr;
+            const int lastRow  = (end - 1) / bpr;
+            emit hexModel->dataChanged(hexModel->index(firstRow, 0),
+                                       hexModel->index(lastRow, hexModel->columnCount() - 1));
+        }
+    }
+}
+
+// Simple graphical preview bar for Load-at-Offset
+class LoadPreviewBar : public QWidget {
+public:
+    explicit LoadPreviewBar(QWidget *parent=nullptr) : QWidget(parent) {
+        setMinimumHeight(70);
+    }
+    void setParams(qulonglong bufSize, qulonglong off, qulonglong dataLen, qulonglong padLen) {
+        bufSize_ = bufSize; off_ = off; dataLen_ = dataLen; padLen_ = padLen; update();
+    }
+protected:
+    QSize sizeHint() const override { return QSize(380, 74); }
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing, false);
+
+        const int W = width();
+        const int H = height();
+        const int barH = 16;
+        const int y = 8; // top margin
+
+        // Determine total span to visualize
+        qulonglong total = bufSize_;
+        qulonglong prePadLen = 0;
+        if (off_ > bufSize_) prePadLen = off_ - bufSize_;
+        const qulonglong newEnd = (off_ + dataLen_ + padLen_);
+        if (newEnd > total) total = newEnd;
+        if (total == 0) {
+            p.fillRect(0, y, W, barH, QColor(230,230,230));
+            p.setPen(Qt::gray);
+            p.drawRect(0, y, W-1, barH);
+            p.drawText(6, y+barH+16, "(empty)");
+            return;
+        }
+
+        auto xFor = [&](qulonglong v){ return int((double(v) / double(total)) * (W-2)) + 1; };
+
+        // Background (gap/empty) light gray
+        p.fillRect(0, y, W, barH, QColor(235,235,235));
+        p.setPen(QColor(180,180,180));
+        p.drawRect(0, y, W-1, barH);
+
+        // Existing buffer region [0, bufSize_)
+        if (bufSize_ > 0) {
+            int x0 = xFor(0), x1 = xFor(bufSize_);
+            p.fillRect(x0, y, qMax(1, x1-x0), barH, QColor(180,180,180)); // darker gray
+        }
+
+        // Pre-padding from buffer end to offset (if any)
+        if (prePadLen > 0) {
+            int x0 = xFor(bufSize_);
+            int x1 = xFor(off_);
+            p.fillRect(x0, y, qMax(1, x1 - x0), barH, QColor(250, 220, 120)); // yellow
+        }
+
+        // New data region [off_, off_+dataLen_)
+        if (dataLen_ > 0) {
+            int x0 = xFor(qMin(off_, total));
+            int x1 = xFor(qMin(off_ + dataLen_, total));
+            p.fillRect(x0, y, qMax(1, x1-x0), barH, QColor(120, 200, 120)); // green
+        }
+
+        bool hasOverlap = false;
+
+        // Overlap: portion of new data that overwrites existing buffer [0, bufSize_)
+        if (dataLen_ > 0 && bufSize_ > 0) {
+            const qulonglong dataStart = off_;
+            const qulonglong dataEnd   = off_ + dataLen_;
+            // True intersection of [dataStart, dataEnd) with [0, bufSize_)
+            const qulonglong ovStart = std::max<qulonglong>(dataStart, 0);
+            const qulonglong ovEnd   = std::min<qulonglong>(dataEnd,   bufSize_);
+            if (ovEnd > ovStart) {
+                int xr0 = xFor(ovStart);
+                int xr1 = xFor(ovEnd);
+                QColor red(220, 80, 80, 180); // semi-transparent red overlay
+                p.fillRect(xr0, y, qMax(1, xr1 - xr0), barH, red);
+                hasOverlap = true;
+            }
+        }
+
+        // Padding region [off_+dataLen_, off_+dataLen_+padLen_)
+        if (padLen_ > 0) {
+            int x0 = xFor(qMin(off_ + dataLen_, total));
+            int x1 = xFor(qMin(off_ + dataLen_ + padLen_, total));
+            p.fillRect(x0, y, qMax(1, x1-x0), barH, QColor(250, 220, 120)); // yellow
+        }
+
+        // Simple tick labels
+        p.setPen(Qt::black);
+        QFont f = p.font(); f.setPointSizeF(f.pointSizeF()-1); p.setFont(f);
+        const QString startTxt = QString("0x") + QString::number(0,16).toUpper();
+        const QString offTxt   = QString("0x") + QString::number(off_,16).toUpper();
+        const QString endTxt   = QString("0x") + QString::number(total ? total-1 : 0,16).toUpper();
+        p.drawText(4, y+barH+14, startTxt);
+        // draw off only if meaningful and inside range
+        if (off_ > 0 && off_ < total) {
+            int xo = xFor(off_);
+            p.setPen(QColor(80,80,80));
+            p.drawLine(xo, y+barH, xo, y+barH+4);
+            p.setPen(Qt::black);
+            p.drawText(qMin(qMax(4, xo-40), W-60), y+barH+14, offTxt);
+        }
+        p.drawText(W-4 - p.fontMetrics().horizontalAdvance(endTxt), y+barH+14, endTxt);
+
+        int ly = y + barH + 30;
+        auto legend = [&](QColor c, const QString &t, int &lx){
+            p.fillRect(lx, ly-10, 10, 10, c);
+            p.setPen(Qt::black);
+            p.drawRect(lx, ly-10, 10, 10);
+            p.drawText(lx+14, ly, t);
+            lx += 14 + p.fontMetrics().horizontalAdvance(t) + 12;
+        };
+        const bool hasBuffer  = (bufSize_ > 0);
+        // dataLen_ is the file portion (green) that will be written
+        const bool hasData    = (dataLen_ > 0);
+        const bool hasPadding = (prePadLen > 0) || (padLen_ > 0);
+        int lx = 4;
+        if (hasBuffer)  legend(QColor(180,180,180), tr("buffer"),  lx);
+        if (hasData)    legend(QColor(120,200,120), tr("data"),    lx);
+        if (hasPadding) legend(QColor(250,220,120), tr("padding"), lx);
+        if (hasOverlap) legend(QColor(220, 80, 80), tr("overlap"), lx);
+    }
+private:
+    qulonglong bufSize_{};
+    qulonglong off_{};
+    qulonglong dataLen_{};
+    qulonglong padLen_{};
+};
+
+// --- UI: Load at offset dialog --------------------------------------------
+
+void MainWindow::loadAtOffsetDialog() {
+    // 1) Pick file FIRST so we know its size and can default length accordingly
+    const QString path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,
+        tr("All files (*);;Binary (*.bin)"));
+    if (path.isEmpty()) return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        return;
+    }
+    const QByteArray file = f.readAll();
+    const qulonglong fileSize = static_cast<qulonglong>(file.size());
+
+    // 2) Ask for offset/length/pad now that we know the file size
+    QDialog dlg(this);
+    dlg.setWindowTitle(tr("Load at offset"));
+    auto *form = new QFormLayout(&dlg);
+
+    // Show selected file name (no path) at the top for user context
+    const QString baseName = QFileInfo(path).fileName();
+    auto *lblFile = new QLabel(baseName, &dlg);
+    lblFile->setToolTip(path); // show full path on hover
+    lblFile->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    {
+        QFont bf = lblFile->font();
+        bf.setBold(true);
+        lblFile->setFont(bf);
+    }
+    form->addRow(tr("File:"), lblFile);
+
+    // Default offset = end of current buffer
+    auto *editOff = new QLineEdit(&dlg);
+    {
+        const qulonglong defOff = static_cast<qulonglong>(buffer_.size());
+        const QString hx = QString::number(defOff, 16).toUpper();
+        editOff->setText(QString("0x") + hx);
+    }
+
+    // Default length = whole file
+    auto *editLen = new QLineEdit(&dlg);
+    editLen->setText(QString("0x%1").arg(QString::number(fileSize, 16).toUpper()));
+
+    auto *editPad = new QLineEdit(&dlg);
+    editPad->setText("0xFF");
+
+    // Live helper labels
+    auto *lblOffInfo = new QLabel(&dlg);
+    auto *lblLenInfo = new QLabel(&dlg);
+    auto *lblEndInfo = new QLabel(&dlg);
+
+    // Preview widget
+    auto *preview = new LoadPreviewBar(&dlg);
+
+    // --- Add warning label and keep handle to OK button ---
+    // (We'll create the button box and warning label before the lambda.)
+    auto *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    auto *okBtn  = bb->button(QDialogButtonBox::Ok);
+    okBtn->setEnabled(false); // We'll enable based on field validity in updateInfo
+
+    auto updateInfo = [this, editOff, editLen, editPad, lblOffInfo, lblLenInfo, lblEndInfo, fileSize, okBtn, preview]() {
+        qulonglong off=0, lenReq=0, padTmp=0xFF;
+        const bool offOk = parseSizeLike(editOff->text(), off);
+        bool lenOk = parseSizeLike(editLen->text(), lenReq);
+        const bool padOk = parseSizeLike(editPad->text(), padTmp) && padTmp <= 0xFF;
+        if (!lenOk) lenReq = 0; // show invalid gracefully
+
+        // For preview, use requested length if provided (>0); if empty/invalid, preview whole file
+        const bool haveLen = (lenOk && lenReq > 0);
+        const qulonglong effLen = haveLen ? lenReq : fileSize;
+
+        // Offset info
+        if (offOk) {
+            lblOffInfo->setText(QString("Offset = 0x%1  (%2)")
+                                .arg(QString::number(off, 16).toUpper())
+                                .arg(QLocale().toString(off)));
+        } else {
+            lblOffInfo->setText(tr("Invalid offset"));
+        }
+
+        // Length + File info (multi-line)
+        if (haveLen) {
+            if (lenReq > fileSize) {
+                const qulonglong padCount = lenReq - fileSize;
+                lblLenInfo->setText(QString("LENGTH = 0x%1 (%2)\nFILE = 0x%3 (%4)")
+                                    .arg(QString::number(lenReq, 16).toUpper())
+                                    .arg(QLocale().toString(lenReq))
+                                    .arg(QString::number(fileSize, 16).toUpper())
+                                    .arg(QLocale().toString(fileSize)));
+            } else {
+                lblLenInfo->setText(QString("LENGTH = 0x%1 (%2)\nFILE = 0x%3 (%4)")
+                                    .arg(QString::number(lenReq, 16).toUpper())
+                                    .arg(QLocale().toString(lenReq))
+                                    .arg(QString::number(fileSize, 16).toUpper())
+                                    .arg(QLocale().toString(fileSize)));
+            }
+        } else {
+            lblLenInfo->setText(QString("LENGTH = (whole file)\nFILE = 0x%1 (%2)")
+                                .arg(QString::number(fileSize, 16).toUpper())
+                                .arg(QLocale().toString(fileSize)));
+        }
+
+        // End address / new buffer size (use effLen)
+        if (offOk && effLen > 0) {
+            const qulonglong endAddr = off + effLen - 1;
+            const qulonglong newSizeIfAppend = std::max<qulonglong>(buffer_.size(), off + effLen);
+            lblEndInfo->setText(QString("END ADDR = 0x%1 (%2)\nNEW BUFFER SIZE = 0x%3 (%4)")
+                                .arg(QString::number(endAddr, 16).toUpper())
+                                .arg(QLocale().toString(endAddr))
+                                .arg(QString::number(newSizeIfAppend, 16).toUpper())
+                                .arg(QLocale().toString(newSizeIfAppend)));
+        } else {
+            lblEndInfo->clear();
+        }
+
+        // Calculate preview parts: file portion (green) and post-data padding (yellow)
+        const qulonglong filePart = haveLen ? std::min<qulonglong>(lenReq, fileSize) : fileSize;
+        const qulonglong postPad  = (haveLen && lenReq > fileSize) ? (lenReq - fileSize) : 0;
+        const bool prePadNeeded = offOk && (off > static_cast<qulonglong>(buffer_.size()));
+        editPad->setEnabled(postPad > 0 || prePadNeeded);
+        preview->setParams(static_cast<qulonglong>(buffer_.size()), offOk ? off : 0, filePart, postPad);
+
+        // Enable OK when we have a valid offset, a positive effective length, and a valid pad
+        okBtn->setEnabled(offOk && (effLen > 0) && padOk);
+    };
+
+    QObject::connect(editOff, &QLineEdit::textChanged, &dlg, updateInfo);
+    QObject::connect(editLen, &QLineEdit::textChanged, &dlg, updateInfo);
+    QObject::connect(editPad, &QLineEdit::textChanged, &dlg, updateInfo);
+
+    form->addRow(tr("Offset:"), editOff);
+    form->addRow(QString(), lblOffInfo);
+    form->addRow(tr("Length:"), editLen);
+    form->addRow(QString(), lblLenInfo);
+
+    form->addRow(tr("Pad:"),    editPad);
+    form->addRow(QString(), lblEndInfo);
+    form->addRow(tr("Preview:"), preview);
+    form->addRow(bb);
+    connect(bb, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(bb, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    updateInfo();
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    // Parse final values
+    qulonglong off=0, len=0, pad=0xFF;
+    if (!parseSizeLike(editOff->text(), off)) { log->appendPlainText("[Error] invalid offset"); return; }
+    if (!editLen->text().trimmed().isEmpty() && !parseSizeLike(editLen->text(), len)) {
+        log->appendPlainText("[Error] invalid length"); return;
+    }
+    if (!parseSizeLike(editPad->text(), pad) || pad > 0xFF) {
+        log->appendPlainText("[Error] invalid pad"); return;
+    }
+
+    // Determine effective length: default to full file if length omitted/invalid
+    const qulonglong effLen = (len == 0) ? fileSize : len;
+
+    // Build a data block of effLen: file bytes then padding (if requested > file)
+    QByteArray data;
+    data.reserve(static_cast<int>(effLen));
+    const qulonglong take = std::min<qulonglong>(effLen, fileSize);
+    data.append(file.left(static_cast<int>(take)));
+    if (effLen > take) data.append(QByteArray(static_cast<int>(effLen - take), char(pad & 0xFF)));
+
+    // Patch the buffer with PAD used also for growth between current size and offset
+    patchBuffer(static_cast<int>(off), data, char(pad & 0xFF));
+    addSegmentAndRefresh(this, off, effLen, QFileInfo(path).fileName());
+    lastPath_ = QFileInfo(path).absolutePath();
+
+    log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+                         .arg(QLocale().toString(effLen))
+                         .arg(QString::number(off, 16).toUpper())
+                         .arg(path));
+
+    if (lblBufSize)
+        lblBufSize->setText(QString("Size: %1 (0x%2)")
+                            .arg(QLocale().toString(buffer_.size()))
+                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+    if (lblBufDirty && hexModel)
+        lblBufDirty->setText(QString("Modified: %1").arg(hexModel->dirtyCount()));
+
+    updateActionEnabling();
+}
+
+// --- Buffer segment legend helpers ---
+static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs) {
+    auto *legendTable = parent->findChild<QTableWidget*>("bufferLegendTable");
+    if (!legendTable) return;
+    legendTable->setRowCount(segs.size());
+    int row = 0;
+    for (const auto &s : segs) {
+        const qulonglong end = (s.length ? (s.start + s.length - 1) : s.start);
+        auto *itStart = new QTableWidgetItem(QString("0x") + QString::number(s.start, 16));
+        auto *itEnd   = new QTableWidgetItem(QString("0x") + QString::number(end, 16));
+        auto *itSize  = new QTableWidgetItem(QString::number(s.length) + QString(" (0x") + QString::number(s.length, 16) + ")");
+        auto *itLabel = new QTableWidgetItem(s.label);
+        legendTable->setItem(row, 0, itStart);
+        legendTable->setItem(row, 1, itEnd);
+        legendTable->setItem(row, 2, itSize);
+        legendTable->setItem(row, 3, itLabel);
+        ++row;
+    }
+    legendTable->resizeRowsToContents();
+}
+
+static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label) {
+    // Merge/simple append (no coalescing yet)
+    gSegments.append(BufferSegment{start, length, label});
+    std::sort(gSegments.begin(), gSegments.end(), [](const BufferSegment &a, const BufferSegment &b){ return a.start < b.start; });
+    updateLegendTable(parent, gSegments);
 }

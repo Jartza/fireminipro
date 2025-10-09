@@ -18,7 +18,7 @@
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
-    QCoreApplication::setOrganizationName("Firebay");
+    QCoreApplication::setOrganizationName("Firebay refurb");
     QCoreApplication::setApplicationName("fireminipro");
 
     MainWindow w;
