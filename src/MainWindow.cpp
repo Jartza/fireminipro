@@ -82,7 +82,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // When selection changes, update action enabling
     connect(comboDevice, qOverload<int>(&QComboBox::currentIndexChanged),
-        this, [this](int){ updateActionEnabling(); });
+        this, [this](int idx){
+            updateActionEnabling();
+            if (idx >= 0 && proc) {
+                const QString programmer = comboProgrammer->currentText().trimmed();
+                const QString device     = comboDevice->itemText(idx).trimmed();
+                if (!programmer.isEmpty() && !device.isEmpty()) {
+                    clearChipInfo();                    // optional: clear UI immediately
+                    proc->fetchChipInfo(programmer, device);
+                }
+            } else if (idx < 0) {
+                // Optional: if selection cleared, clear the chip info too
+                clearChipInfo();
+            }
+        });
 
     connect(comboDevice->lineEdit(),
       &QLineEdit::textEdited,
