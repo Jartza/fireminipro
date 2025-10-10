@@ -8,6 +8,30 @@
 #include <QDateTime>
 #include <QStandardPaths>
 
+namespace {
+// Remove simple ANSI CSI sequences like "\x1B[K", "\x1B[2K", etc.
+static inline QString stripAnsi(QString s) {
+    static QRegularExpression ansiRe(R"(\x1B\[[0-9;]*[A-Za-z])");
+    return s.remove(ansiRe);
+}
+
+// Return 0–100 if a % is found, otherwise -1
+static int extractPercent(const QString& line)
+{
+    if (line.endsWith("ms  OK", Qt::CaseInsensitive)) {
+        return 100;
+    }
+
+    static QRegularExpression re(R"((\d{1,3})\s*%)");
+    auto m = re.match(line);
+    if (!m.hasMatch()) return -1;
+
+    bool ok = false;
+    int pct = m.captured(1).toInt(&ok);
+    return (ok && pct >= 0 && pct <= 100) ? pct : -1;
+}
+} // namespace
+
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
     if (bin.isEmpty()) {
@@ -281,13 +305,20 @@ void ProcessHandling::handleStderr() {
     const QString all = QString::fromLocal8Bit(process_.readAllStandardError());
     stderrBuffer_.append(all);
 
-    //TODO remove
-    return;
-
     const auto lines = all.split('\n');
-    for (const QString &ln : lines) {
-        const QString t = ln.trimmed();
-        if (!t.isEmpty()) emit errorLine(t);
+    for (QString ln : lines) {
+        if (ln.isEmpty()) continue;
+
+        ln = stripAnsi(ln).trimmed();
+
+        // (Optional) keep your current logging:
+        emit errorLine(ln);
+
+        // NEW: peek percent and dump to qDebug() for now
+        const int pct = extractPercent(ln);
+        if (pct >= 0) {
+            qDebug() << "[progress]" << pct;
+        }
     }
 }
 
