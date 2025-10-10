@@ -80,6 +80,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
     comboDevice->setCompleter(completer);
 
+    // When selection changes, update action enabling
+    connect(comboDevice, qOverload<int>(&QComboBox::currentIndexChanged),
+        this, [this](int){ updateActionEnabling(); });
+
     connect(comboDevice->lineEdit(),
       &QLineEdit::textEdited,
       this,
@@ -95,6 +99,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         cb->lineEdit()->setProperty("clearOnFirstClick", true);
       }
     );
+
+    // If user clears the text, we should clear selection
+     connect(comboDevice->lineEdit(), &QLineEdit::textChanged,
+        this, [this](const QString &t){
+            if (t.isEmpty()) {
+                QSignalBlocker block(comboDevice);
+                comboDevice->setCurrentIndex(-1);
+                updateActionEnabling();
+            }
+        });
+
 
     comboDevice->lineEdit()->installEventFilter(this);
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
@@ -305,7 +320,7 @@ void MainWindow::setUiEnabled(bool on) {
 }
 
 void MainWindow::updateActionEnabling() {
-    const bool deviceSelected = !comboDevice->currentText().isEmpty();
+    const bool deviceSelected = (comboDevice->currentIndex() >= 0);
     const bool hasBuffer      = !buffer_.isEmpty();
 
     if (btnRead)  btnRead->setEnabled(deviceSelected);               // Read needs device
