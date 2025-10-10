@@ -160,21 +160,13 @@ void ProcessHandling::handleStderr() {
 }
 
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
-    emit logLine(QString("[Process finished] exit code %1, status %2")
-                 .arg(exitCode)
-                 .arg(status == QProcess::NormalExit ? "normal" : "crashed"));
-    emit logLine(QString("Mode = %1").arg(static_cast<int>(mode_)));
     if (mode_ == Mode::Scan) {
-        emit logLine("[Scan output]");
         const QStringList names = parseProgrammerList(stderrBuffer_);
-
         mode_ = Mode::Idle;
         emit devicesScanned(names);
     } else if (mode_ == Mode::DeviceList) {
-        emit logLine("[Device list output]");
         QStringList devices = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
         for (QString &s : devices) {
-            emit logLine("[Device] " + s);
             s = s.trimmed();
         }
         // very light filtering
@@ -182,7 +174,6 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             return s.isEmpty();
         }), devices.end());
         devices.removeDuplicates();
-
         mode_ = Mode::Idle;
         emit devicesListed(devices);
     } else {
