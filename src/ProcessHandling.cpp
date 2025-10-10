@@ -125,7 +125,7 @@ static QString uniqueTempPath(const QString& base = "fireminipro-read")
 {
     const QString tmpRoot =
         QStandardPaths::writableLocation(QStandardPaths::TempLocation);
-    const QString ts = QDateTime::currentDateTimeUtc().toString("yyyyMMdd-hhmmss");
+    const QString ts = QDateTime::currentDateTime().toString("yyMMdd-hhmmss");
     return QDir(tmpRoot).filePath(base + "-" + ts + ".bin");
 }
 
@@ -138,12 +138,14 @@ void ProcessHandling::readChipImage(const QString& programmer,
     // Parse device name without @ending, if one exists
     QString deviceName = device.split('@').first().trimmed();
     QString outPath = uniqueTempPath(deviceName);
+    qDebug() << "[Temp path]" << outPath;
     pendingTempPath_ = outPath;
 
     QStringList args;
-    if (!programmer.trimmed().isEmpty()) {
-        args << "-q" << programmer.trimmed();
-    }
+    // if (!programmer.trimmed().isEmpty()) {
+    //     args << "-q" << programmer.trimmed();
+    // }
+
     args << "-p" << device << "-r" << outPath;
     args << extraFlags;
 
@@ -313,6 +315,8 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         emit chipInfoReady(ci);
     } else if (mode_ == Mode::Reading) {
         const bool ok = (status == QProcess::NormalExit && exitCode == 0);
+        // print debug info
+        qDebug() << "[Process finished] exit=" << exitCode << "status=" << status;
         if (ok) {
             mode_ = Mode::Idle;
             emit readReady(pendingTempPath_);
@@ -320,7 +324,6 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             mode_ = Mode::Idle;
             emit errorLine(QString("[Read error] exit=%1").arg(exitCode));
         }
-        pendingTempPath_.clear();
     } else {
         mode_ = Mode::Idle;
     }

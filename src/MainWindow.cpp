@@ -287,7 +287,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
-    connect(btnLoad, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
+    connect(btnLoad, &QPushButton::clicked, this, [this]{
+        loadAtOffsetDialog();
+    });
     connect(comboDevice, &QComboBox::currentTextChanged,
         this, [this](const QString&){ updateActionEnabling(); });
 
@@ -343,6 +345,21 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(proc, &ProcessHandling::chipInfoReady,
         this, &MainWindow::updateChipInfo);
 
+    // Read from target
+    connect(btnRead, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        proc->readChipImage(p, d, optionFlags());
+    });
+
+    // Read from target is ready
+    connect(proc, &ProcessHandling::readReady, this, [this](const QString& tempPath){
+        // Use the same dialog, but with a preselected path
+        loadAtOffsetDialog(tempPath);
+    });
+
     // initial state
     setUiEnabled(true);
     updateActionEnabling();
@@ -387,7 +404,7 @@ QStringList MainWindow::optionFlags() const {
     if (chkBlankCheck->isChecked())    f << "--blank_check";
     if (chkErase->isChecked())         f << "--erase";
     if (chkSkipVerify->isChecked())    f << "--skip_verify";
-    if (chkIgnoreId->isChecked())      f << "--no_id_error";
+    if (chkIgnoreId->isChecked())      f << "-y";
     if (chkSkipId->isChecked())        f << "--skip_id";
     if (chkNoSizeErr->isChecked())     f << "--no_size_error";
     if (chkPinCheck->isChecked())      f << "--pin_check";
@@ -653,11 +670,13 @@ private:
 };
 
 // Load file to buffer at user-specified offset, with optional padding
-void MainWindow::loadAtOffsetDialog() {
-    // Pick file first so we know its size and can default length accordingly
-    const QString path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,
-        tr("All files (*);;Binary (*.bin)"));
-    if (path.isEmpty()) return;
+void MainWindow::loadAtOffsetDialog(QString path) {
+    // If preset path is given, skip the file picker dialog
+    if (path.isEmpty()) {
+        path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,
+            tr("All files (*);;Binary (*.bin)"));
+        if (path.isEmpty()) return;
+    }
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {

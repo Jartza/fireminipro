@@ -23,7 +23,7 @@ public:
 
 private slots:
     void saveBufferToFile();
-    void loadAtOffsetDialog();
+    void loadAtOffsetDialog(QString path = {});
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
 
