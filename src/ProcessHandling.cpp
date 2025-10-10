@@ -135,6 +135,9 @@ void ProcessHandling::handleStdout() {
     const QString raw = QString::fromLocal8Bit(process_.readAllStandardOutput());
     stdoutBuffer_.append(raw);
 
+    //TODO remove
+    return;
+
     const auto lines = raw.split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
@@ -146,6 +149,9 @@ void ProcessHandling::handleStderr() {
     const QString all = QString::fromLocal8Bit(process_.readAllStandardError());
     stderrBuffer_.append(all);
 
+    //TODO remove
+    return;
+
     const auto lines = all.split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
@@ -154,28 +160,36 @@ void ProcessHandling::handleStderr() {
 }
 
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
+    emit logLine(QString("[Process finished] exit code %1, status %2")
+                 .arg(exitCode)
+                 .arg(status == QProcess::NormalExit ? "normal" : "crashed"));
+    emit logLine(QString("Mode = %1").arg(static_cast<int>(mode_)));
     if (mode_ == Mode::Scan) {
+        emit logLine("[Scan output]");
         const QStringList names = parseProgrammerList(stderrBuffer_);
-        emit devicesScanned(names);
+
         mode_ = Mode::Idle;
-        stdoutBuffer_.clear();
+        emit devicesScanned(names);
     } else if (mode_ == Mode::DeviceList) {
-        // Devices are printed on STDOUT by `-l`
+        emit logLine("[Device list output]");
         QStringList devices = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
-        for (QString &s : devices) s = s.trimmed();
+        for (QString &s : devices) {
+            emit logLine("[Device] " + s);
+            s = s.trimmed();
+        }
         // very light filtering
         devices.erase(std::remove_if(devices.begin(), devices.end(), [](const QString &s){
             return s.isEmpty();
         }), devices.end());
         devices.removeDuplicates();
 
-        emit devicesListed(devices);
         mode_ = Mode::Idle;
-        stdoutBuffer_.clear();
+        emit devicesListed(devices);
     } else {
         mode_ = Mode::Idle;
-        stdoutBuffer_.clear();
     }
+    stderrBuffer_.clear();
+    stdoutBuffer_.clear();
     emit finished(exitCode, status);
 }
 
