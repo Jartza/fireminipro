@@ -24,6 +24,8 @@
 #include <QTableWidget>
 #include <QHeaderView>
 #include <QTimer>
+#include <QSortFilterProxyModel>
+#include <QCompleter>
 #include <algorithm>
 
 #include "MainWindow.h"
@@ -63,6 +65,39 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboDevice->setPlaceholderText("No devices");
     groupTargets->setLayout(gridT);
     leftLayout->addWidget(groupTargets);
+
+    // Make device combobox searchable / filterable
+    comboDevice->setEditable(true);
+    comboDevice->setInsertPolicy(QComboBox::NoInsert);
+    comboDevice->setFocusPolicy(Qt::StrongFocus);
+    comboDevice->lineEdit()->setClearButtonEnabled(true);
+
+    auto *filter_model = new QSortFilterProxyModel(comboDevice);
+    filter_model->setFilterCaseSensitivity(Qt::CaseInsensitive);
+    filter_model->setSourceModel(comboDevice->model());
+
+    auto *completer = new QCompleter(filter_model, comboDevice);
+    completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
+    comboDevice->setCompleter(completer);
+
+    connect(comboDevice->lineEdit(),
+      &QLineEdit::textEdited,
+      this,
+      [this, filter_model](const QString &text) {
+        filter_model->setFilterFixedString(text);
+      }
+    );
+
+    connect(comboDevice,
+      &QComboBox::textActivated,
+      comboDevice->lineEdit(),
+      [cb = comboDevice]() {
+        cb->lineEdit()->setProperty("clearOnFirstClick", true);
+      }
+    );
+
+    comboDevice->lineEdit()->installEventFilter(this);
+    comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
     // Buffer group
     auto *groupBuffer = new QGroupBox("Buffer", leftBox);
@@ -243,6 +278,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setUiEnabled(true);
     updateActionEnabling();
 }
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
+  if (obj == comboDevice->lineEdit()) {
+    auto *edit = comboDevice->lineEdit();
+
+    // First click inside the edit clears it
+    if (e->type() == QEvent::MouseButtonPress) {
+      if (edit->property("clearOnFirstClick").toBool()) {
+        edit->clear();
+        edit->setProperty("clearOnFirstClick", false);
+      }
+    }
+  }
+  return QMainWindow::eventFilter(obj, e);
+}
+
 
 void MainWindow::setUiEnabled(bool on) {
     // Enabled at boot

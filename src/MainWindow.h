@@ -91,4 +91,8 @@ private:
     bool parseSizeLike(const QString &in, qulonglong &out);
     void ensureBufferSize(int newSize, char padByte);
     void patchBuffer(int offset, const QByteArray &data, char padByte);
+
+protected:
+      bool eventFilter(QObject *obj, QEvent *event) override;
+
 };
