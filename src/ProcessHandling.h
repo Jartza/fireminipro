@@ -12,6 +12,8 @@ public:
     // Fire-and-forget scan for connected programmers (minipro -k)
     void scanConnectedDevices();
     void fetchSupportedDevices(const QString &programmer);
+    // Fetch information about selected chip (minipro -d "<dev>")
+    void fetchChipInfo(const QString &programmer, const QString &device);
 
     struct ChipInfo {
         QString baseName;     // e.g. "AM2764A"        (may be empty)
@@ -21,6 +23,7 @@ public:
         QString protocol;     // "0x07" or empty
         int     readBuf = 0;  // bytes; 0 if unknown
         int     writeBuf = 0; // bytes; 0 if unknown
+        QString raw;          // full captured text for debugging
     };
 
 signals:
@@ -32,6 +35,8 @@ signals:
     // Emitted after scanConnectedDevices() completes
     void devicesScanned(const QStringList &names);
     void devicesListed(const QStringList &names);
+    // Emitted when chip info is fetched
+    void chipInfoReady(const ChipInfo &ci);
 
 private slots:
     void handleStdout();
@@ -40,7 +45,7 @@ private slots:
 
 private:
     // Internal mode to disambiguate generic runs vs scans
-    enum class Mode { Idle, Generic, Scan, DeviceList };
+    enum class Mode { Idle, Generic, Scan, DeviceList, ChipInfo };
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
     QString stderrBuffer_;
@@ -48,5 +53,6 @@ private:
     void parseLine(const QString &line);
     QString resolveMiniproPath();
     QStringList parseProgrammerList(const QString &text) const;
+    ChipInfo parseChipInfo(const QString &text) const;
     QProcess process_;
 };

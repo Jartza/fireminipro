@@ -145,7 +145,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addWidget(groupChipInfo);
 
     // start clean
-    //clearChipInfo();
+    clearChipInfo();
 
     // Buffer group
     auto *groupBuffer = new QGroupBox("Buffer", leftBox);
@@ -160,7 +160,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
     gridB->addWidget(btnLoad,      0, 0, 1, 2);
-    gridB->addWidget(btnClear,    1, 0, 1, 1);
+    gridB->addWidget(btnClear,     1, 0, 1, 1);
     gridB->addWidget(btnSave,      1, 1, 1, 1);
     gridB->addWidget(btnRead,      2, 0, 1, 1);
     gridB->addWidget(btnWrite,     2, 1, 1, 1);
@@ -321,6 +321,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
                 comboDevice->setEnabled(false);
                 proc->fetchSupportedDevices(p.trimmed());
             });
+
+    // Fetch chip info
+    connect(proc, &ProcessHandling::chipInfoReady,
+        this, &MainWindow::updateChipInfo);
 
     // initial state
     setUiEnabled(true);

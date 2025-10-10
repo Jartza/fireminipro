@@ -52,6 +52,72 @@ QStringList ProcessHandling::parseProgrammerList(const QString &text) const {
     return out;
 }
 
+ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) const
+{
+    ChipInfo ci;
+    ci.raw = text;
+
+    auto rxLine = [](const QString &label){
+        return QRegularExpression("^\\s*" + QRegularExpression::escape(label) + "\\s*:\\s*(.+)\\s*$",
+                                  QRegularExpression::MultilineOption);
+    };
+    auto cap1 = [&](const QRegularExpression &rx) -> QString {
+        auto m = rx.match(text);
+        return m.hasMatch() ? m.captured(1).trimmed() : QString{};
+    };
+
+    // Name: "AM2764A@DIP28" or just "AM2764A"
+    {
+        const QString nameLine = cap1(rxLine("Name"));
+        if (!nameLine.isEmpty()) {
+            const int at = nameLine.indexOf('@');
+            if (at >= 0) {
+                ci.baseName = nameLine.left(at).trimmed();
+                ci.package  = nameLine.mid(at + 1).trimmed();
+            } else {
+                ci.baseName = nameLine.trimmed();
+            }
+        }
+    }
+
+    // Memory: "8192 Bytes" or "262144 Words"
+    {
+        QRegularExpression rxMem(R"(^\s*Memory\s*:\s*([0-9]+)\s*(Bytes?|Words?)\s*$)",
+                                 QRegularExpression::MultilineOption | QRegularExpression::CaseInsensitiveOption);
+        auto m = rxMem.match(text);
+        if (m.hasMatch()) {
+            const qulonglong val = m.captured(1).toULongLong();
+            const QString unit = m.captured(2).toLower();
+            if (unit.startsWith("word")) {
+                ci.bytes = val * 2;   // words -> bytes
+                ci.wordBits = 16;
+            } else {
+                ci.bytes = val;
+                ci.wordBits = 8;
+            }
+        }
+    }
+
+    // Protocol: "0x07"
+    {
+        const QString proto = cap1(rxLine("Protocol"));
+        if (!proto.isEmpty()) ci.protocol = proto;
+    }
+
+    // Read/Write buffer sizes: "Read buffer size: 1024 Bytes", "Write buffer size: 128 Bytes"
+    auto parseSize = [&](const QString &label) -> qulonglong {
+        QRegularExpression rx(QString(R"(^\s*)") + QRegularExpression::escape(label) +
+                              R"(\s*:\s*([0-9]+))",
+                              QRegularExpression::MultilineOption | QRegularExpression::CaseInsensitiveOption);
+        auto m = rx.match(text);
+        return m.hasMatch() ? m.captured(1).toULongLong() : 0ull;
+    };
+    ci.readBuf  = parseSize("Read buffer size");
+    ci.writeBuf = parseSize("Write buffer size");
+
+    return ci;
+}
+
 ProcessHandling::ProcessHandling(QObject *parent)
     : QObject(parent)
 {
@@ -122,6 +188,31 @@ void ProcessHandling::fetchSupportedDevices(const QString &programmer)
     process_.start();
 }
 
+void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &device)
+{
+    if (process_.state() != QProcess::NotRunning)
+        process_.kill();
+
+    const QString bin = resolveMiniproPath();
+
+    // Build args. QProcess handles spaces in args, no manual quoting needed.
+    QStringList args;
+    if (!programmer.isEmpty())
+        args << "-q" << programmer;
+    args << "-d" << device;
+
+    emit logLine("[Run] " + bin + " " + args.join(' '));
+
+    mode_ = Mode::ChipInfo;
+    stdoutBuffer_.clear();
+    stderrBuffer_.clear();
+
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.start();
+}
+
 void ProcessHandling::sendResponse(const QString &input) {
     if (process_.state() == QProcess::Running) {
         QTextStream(&process_).operator<<(input + "\n");
@@ -174,6 +265,11 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         devices.removeDuplicates();
         mode_ = Mode::Idle;
         emit devicesListed(devices);
+    } else if (mode_ == Mode::ChipInfo) {
+        const QString merged = stdoutBuffer_ + "\n" + stderrBuffer_;
+        const ChipInfo ci = parseChipInfo(merged);
+        mode_ = Mode::Idle;
+        emit chipInfoReady(ci);
     } else {
         mode_ = Mode::Idle;
     }
