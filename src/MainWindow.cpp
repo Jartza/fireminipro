@@ -365,7 +365,7 @@ void MainWindow::onDevicesListed(const QStringList &names)
     QStringList sorted = names;
     sorted.sort(Qt::CaseInsensitive);
     comboDevice->addItems(sorted);
-    comboDevice->setCurrentIndex(0);
+    comboDevice->setCurrentIndex(-1);
     comboDevice->setEnabled(true);
 
     if (log) log->appendPlainText(QString("[Info] Loaded %1 devices.").arg(sorted.size()));
