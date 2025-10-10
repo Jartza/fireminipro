@@ -37,7 +37,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
     setWindowTitle("fireminipro");
-    resize(1000, 760);
+    this->setMinimumSize(1030,768);
 
     // left column
     auto *leftBox = new QWidget(central);
@@ -251,10 +251,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Hex view/model
     hexModel = new HexView(this);
-    // hexModel->setBytesPerRow(16); // Default is 16
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
-    QFont mono; mono.setFamily("Courier New"); mono.setStyleHint(QFont::Monospace);
+    QFont mono;
+    mono.setFamily("Courier New");
+    mono.setStyleHint(QFont::TypeWriter);
+    mono.setPointSizeF(this->font().pointSizeF() - 1);
     tableHex->setFont(mono);
     tableHex->setWordWrap(false);
     tableHex->setAlternatingRowColors(true);
@@ -270,7 +272,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 
     // set a compact width for all hex byte columns (1..bytesPerRow)
-    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, 28);  // ~2 hex chars + some padding
+    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, 28);
     tableHex->setAlternatingRowColors(true);
     tableHex->verticalHeader()->setDefaultSectionSize(20);
     // ASCII column
