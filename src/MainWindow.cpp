@@ -27,6 +27,7 @@
 #include <QSortFilterProxyModel>
 #include <QCompleter>
 #include <QProgressBar>
+#include <QStyleFactory>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -179,7 +180,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
-
+    progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
