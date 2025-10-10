@@ -84,16 +84,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(comboDevice, qOverload<int>(&QComboBox::currentIndexChanged),
         this, [this](int idx){
             updateActionEnabling();
-            if (idx >= 0 && proc) {
-                const QString programmer = comboProgrammer->currentText().trimmed();
-                const QString device     = comboDevice->itemText(idx).trimmed();
-                if (!programmer.isEmpty() && !device.isEmpty()) {
-                    clearChipInfo();                    // optional: clear UI immediately
-                    proc->fetchChipInfo(programmer, device);
-                }
-            } else if (idx < 0) {
+            if (idx < 0) {
                 // Optional: if selection cleared, clear the chip info too
                 clearChipInfo();
+            }
+        });
+
+    // fetch only on user action
+    connect(comboDevice, qOverload<int>(&QComboBox::activated),
+        this, [this](int idx){
+            if (idx >= 0 && proc) {
+                const QString p = comboProgrammer->currentText().trimmed();
+                const QString d = comboDevice->itemText(idx).trimmed();
+                if (!p.isEmpty() && !d.isEmpty()) {
+                    clearChipInfo();
+                    proc->fetchChipInfo(p, d);
+                }
             }
         });
 
