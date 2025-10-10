@@ -14,6 +14,7 @@ class QLabel;
 class QProcess;
 class QWidget;
 class HexView;
+class QTableWidget;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -78,10 +79,11 @@ private:
 
     // buffer segment legend
     QList<BufferSegment> bufferSegments{};
+    QTableWidget *legendTable{};
 
     // buffer legend manipulation
-    void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
-    void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
+    void updateLegendTable();
+    void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);
 
     // helpers
     QStringList optionFlags() const;
