@@ -3,7 +3,6 @@
 #include <QMainWindow>
 #include <QByteArray>
 #include <QStringList>
-#include <QProcess>
 
 class QComboBox;
 class QPushButton;
@@ -11,7 +10,6 @@ class QTableView;
 class QPlainTextEdit;
 class QCheckBox;
 class QLabel;
-class QProcess;
 class QWidget;
 class HexView;
 class QTableWidget;
@@ -24,10 +22,6 @@ public:
 
 private slots:
     void saveBufferToFile();
-    void readFromDevice();
-    void writeToDevice();
-    void handleProcessOutput();
-    void handleProcessFinished(int exitCode, QProcess::ExitStatus status);
     void loadAtOffsetDialog();
 
 private:
@@ -58,9 +52,6 @@ private:
     // views
     QTableView     *tableHex{};
     QPlainTextEdit *log{};
-
-    // process
-    QProcess *process{};
 
     // hex model
     HexView *hexModel{};

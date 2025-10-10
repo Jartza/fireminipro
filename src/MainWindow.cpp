@@ -6,7 +6,6 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QPlainTextEdit>
-#include <QProcess>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTableView>
@@ -164,16 +163,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *rootLayout = new QVBoxLayout(central);
     rootLayout->addWidget(split);
 
-    // process wiring
-    process = new QProcess(this);
-    connect(process, &QProcess::readyReadStandardOutput, this, &MainWindow::handleProcessOutput);
-    connect(process, &QProcess::readyReadStandardError,  this, &MainWindow::handleProcessOutput);
-    connect(process, QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &MainWindow::handleProcessFinished);
-    connect(chkAsciiSwap, &QCheckBox::toggled, this, [this](bool on){
-        if (hexModel) hexModel->setSwapAscii16(on);
-    });
-
     // button wiring
     connect(btnClear, &QPushButton::clicked, this, [this]{
         buffer_.clear();
@@ -184,8 +173,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
-    connect(btnRead,  &QPushButton::clicked, this, &MainWindow::readFromDevice);
-    connect(btnWrite, &QPushButton::clicked, this, &MainWindow::writeToDevice);
     connect(btnLoad, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
     connect(comboDevice, &QComboBox::currentTextChanged,
         this, [this](const QString&){ updateActionEnabling(); });
@@ -237,49 +224,6 @@ void MainWindow::saveBufferToFile() {
     log->appendPlainText(QString("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
     lastPath_ = QFileInfo(path).absolutePath();
 }
-
-void MainWindow::readFromDevice() {
-    const QString dev = comboDevice->currentText();
-    if (dev.isEmpty()) { log->appendPlainText("[Warn] Select a device first."); return; }
-    // choose a temp file to read into
-    const QString path = QDir::temp().filePath("fireminipro-read.bin");
-    QStringList args; args << "-p" << dev << "-r" << path << optionFlags();
-    log->appendPlainText("[Run] minipro " + args.join(' '));
-    setUiEnabled(false);
-    process->start("minipro", args);
-    // on finish, you could auto-load into buffer_
-}
-
-void MainWindow::writeToDevice() {
-    const QString dev = comboDevice->currentText();
-    if (dev.isEmpty()) { log->appendPlainText("[Warn] Select a device first."); return; }
-    if (buffer_.isEmpty()) { log->appendPlainText("[Warn] Load a buffer first."); return; }
-    // write requires a file; drop to a temp path
-    const QString path = QDir::temp().filePath("fireminipro-write.bin");
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly)) { log->appendPlainText("[Error] tmp save failed"); return; }
-    f.write(buffer_); f.close();
-
-    QStringList args; args << "-p" << dev << "-w" << path << optionFlags();
-    log->appendPlainText("[Run] minipro " + args.join(' '));
-    setUiEnabled(false);
-    process->start("minipro", args);
-}
-
-void MainWindow::handleProcessOutput() {
-    const auto out = QString::fromUtf8(process->readAllStandardOutput()).trimmed();
-    const auto err = QString::fromUtf8(process->readAllStandardError()).trimmed();
-    if (!out.isEmpty()) log->appendPlainText(out);
-    if (!err.isEmpty()) log->appendPlainText(err);
-}
-
-void MainWindow::handleProcessFinished(int exitCode, QProcess::ExitStatus) {
-    updateActionEnabling();
-    log->appendPlainText(QString("[Done] exit=%1").arg(exitCode));
-    // You might decide to auto-load read file into buffer_ here
-}
-
-// --- helpers ---------------------------------------------------------------
 
 // parse sizes like "0x1F000", "8192", "32k", "512K", "1M", "256KB", "2MB"
 bool MainWindow::parseSizeLike(const QString &in, qulonglong &out) {
