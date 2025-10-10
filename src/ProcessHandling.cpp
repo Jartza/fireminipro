@@ -9,14 +9,11 @@ QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
     if (bin.isEmpty()) {
         const QStringList candidates = {
-            "/Users/jartza/src/minipro-vtable/minipro",
             "/opt/homebrew/bin/minipro",
             "/usr/local/bin/minipro",
             "/usr/bin/minipro"
         };
         for (const QString &c : candidates) {
-            // log minipro search attempts to logger
-            emit logLine("trying to find " + c);
             if (QFileInfo::exists(c)) { bin = c; break; }
         }
     }
