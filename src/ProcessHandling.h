@@ -10,6 +10,8 @@ public:
     explicit ProcessHandling(QObject *parent = nullptr);
     void startCommand(const QStringList &args);
     void sendResponse(const QString &input);
+    // Fire-and-forget scan for connected programmers (minipro -k)
+    void scanConnectedDevices();
 
 signals:
     void logLine(const QString &text);     // Normal output
@@ -17,6 +19,8 @@ signals:
     void progress(int percent);            // Parsed progress %
     void promptDetected(const QString &promptText);
     void finished(int exitCode, QProcess::ExitStatus status);
+    // Emitted after scanConnectedDevices() completes
+    void devicesScanned(const QStringList &names);
 
 private slots:
     void handleStdout();
@@ -24,6 +28,14 @@ private slots:
     void handleFinished(int exitCode, QProcess::ExitStatus status);
 
 private:
+    // Internal mode to disambiguate generic runs vs scans
+    enum class Mode { Idle, Generic, Scan };
+    Mode    mode_{Mode::Idle};
+    QString stdoutBuffer_;
+    QString stderrBuffer_;
+
     void parseLine(const QString &line);
+    QString resolveMiniproPath();
+    QStringList parseProgrammerList(const QString &text) const;
     QProcess process_;
 };

@@ -5,15 +5,18 @@
 #include <QStandardPaths>
 #include <QFileInfo>
 
-QString ProcessHandling::resolveMiniproPath() const {
+QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
     if (bin.isEmpty()) {
         const QStringList candidates = {
+            "/Users/jartza/src/minipro-vtable/minipro",
             "/opt/homebrew/bin/minipro",
             "/usr/local/bin/minipro",
             "/usr/bin/minipro"
         };
         for (const QString &c : candidates) {
+            // log minipro search attempts to logger
+            emit logLine("trying to find " + c);
             if (QFileInfo::exists(c)) { bin = c; break; }
         }
     }
@@ -109,9 +112,9 @@ void ProcessHandling::sendResponse(const QString &input) {
 
 void ProcessHandling::handleStdout() {
     const QByteArray raw = process_.readAllStandardOutput();
-    stdoutBuffer_.append(QString::fromUtf8(raw));
+    stdoutBuffer_.append(raw);
 
-    const auto lines = QString::fromUtf8(raw).split('\n');
+    const auto lines = QString::fromLocal8Bit(raw).split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
         if (!t.isEmpty()) parseLine(t);
@@ -119,7 +122,9 @@ void ProcessHandling::handleStdout() {
 }
 
 void ProcessHandling::handleStderr() {
-    const QString all = QString::fromUtf8(process_.readAllStandardError());
+    const QString all = QString::fromLocal8Bit(process_.readAllStandardError());
+    stderrBuffer_.append(all);
+
     const auto lines = all.split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
@@ -129,7 +134,7 @@ void ProcessHandling::handleStderr() {
 
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
     if (mode_ == Mode::Scan) {
-        const QStringList names = parseProgrammerList(stdoutBuffer_);
+        const QStringList names = parseProgrammerList(stderrBuffer_);
         emit devicesScanned(names);
         mode_ = Mode::Idle;
         stdoutBuffer_.clear();

@@ -184,11 +184,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             log, &QPlainTextEdit::appendPlainText);
     connect(proc, &ProcessHandling::errorLine,
             log, &QPlainTextEdit::appendPlainText);
+    connect(proc, &ProcessHandling::devicesScanned, this, [this](const QStringList &names){
+        if (!log) return;
+        if (names.isEmpty()) {
+            log->appendPlainText("[Scan] No programmer found");
+        } else {
+            for (const auto &n : names) log->appendPlainText("[Scan] " + n);
+        }
+    });
 
-    // TODO: just a test for process handling
+    // Trigger a real scan (-k) and log results via devicesScanned
     connect(btnRescan, &QPushButton::clicked, this, [this]{
         if (!proc) return;
-        proc->startCommand(QStringList{"--version"});
+        proc->scanConnectedDevices();
     });
 
     // initial state
