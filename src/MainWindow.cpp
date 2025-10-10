@@ -27,6 +27,7 @@
 
 #include "MainWindow.h"
 #include "HexView.h"
+#include "ProcessHandling.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
@@ -176,6 +177,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(btnLoad, &QPushButton::clicked, this, &MainWindow::loadAtOffsetDialog);
     connect(comboDevice, &QComboBox::currentTextChanged,
         this, [this](const QString&){ updateActionEnabling(); });
+
+    // Process wiring
+    proc = new ProcessHandling(this);
+    connect(proc, &ProcessHandling::logLine,
+            log, &QPlainTextEdit::appendPlainText);
+    connect(proc, &ProcessHandling::errorLine,
+            log, &QPlainTextEdit::appendPlainText);
+
+    // TODO: just a test for process handling
+    connect(btnRescan, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        proc->startCommand(QStringList{"--version"});
+    });
 
     // initial state
     setUiEnabled(true);

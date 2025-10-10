@@ -18,7 +18,7 @@ void ProcessHandling::startCommand(const QStringList &args) {
     if (process_.state() != QProcess::NotRunning)
         process_.kill();
     emit logLine("[Run] minipro " + args.join(' '));
-    process_.start("minipro", args);
+    process_.start("/usr/local/bin/minipro", args);
 }
 
 void ProcessHandling::sendResponse(const QString &input) {

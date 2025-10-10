@@ -13,6 +13,7 @@ class QLabel;
 class QWidget;
 class HexView;
 class QTableWidget;
+class ProcessHandling;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -71,6 +72,9 @@ private:
     // buffer segment legend
     QList<BufferSegment> bufferSegments{};
     QTableWidget *legendTable{};
+
+    // Process handling helper
+    ProcessHandling *proc{};
 
     // buffer legend manipulation
     void updateLegendTable();
