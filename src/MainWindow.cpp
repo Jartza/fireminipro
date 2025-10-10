@@ -155,8 +155,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     addRow(r++, "Memory:",         chipMemory);
     addRow(r++, "Bus width:",      chipBusWidth);
     addRow(r++, "Protocol:",       chipProtocol);
-    addRow(r++, "Read buffer:",    chipReadBuf);
-    addRow(r++, "Write buffer:",   chipWriteBuf);
 
     gridC->setColumnStretch(0, 0);
     gridC->setColumnStretch(1, 1);
@@ -412,8 +410,6 @@ void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
     chipMemory   ->setText(prettyBytes(ci.bytes));
     chipBusWidth ->setText(ci.wordBits > 0         ? QString("%1-bit").arg(ci.wordBits) : "-");
     chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
-    chipReadBuf  ->setText(ci.readBuf  > 0         ? prettyBytes(ci.readBuf)  : "-");
-    chipWriteBuf ->setText(ci.writeBuf > 0         ? prettyBytes(ci.writeBuf) : "-");
 }
 
 void MainWindow::clearChipInfo()
