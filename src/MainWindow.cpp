@@ -56,8 +56,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *gridB  = new QGridLayout(groupBuffer);
     btnClear     = new QPushButton("Clear buffer", groupBuffer);
     btnSave      = new QPushButton("Save buffer", groupBuffer);
-    btnRead      = new QPushButton("Read target",  groupBuffer);
-    btnWrite     = new QPushButton("Write target", groupBuffer);
+    btnRead      = new QPushButton("Read from target",  groupBuffer);
+    btnWrite     = new QPushButton("Write to target", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
     btnLoad      = new QPushButton("Load file to buffer", groupBuffer);
 
