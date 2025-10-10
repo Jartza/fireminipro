@@ -29,8 +29,6 @@
 #include "MainWindow.h"
 #include "HexView.h"
 
-QList<MainWindow::BufferSegment> MainWindow::gSegments = {};
-
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
@@ -179,8 +177,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // button wiring
     connect(btnClear, &QPushButton::clicked, this, [this]{
         buffer_.clear();
-        gSegments.clear();
-        updateLegendTable(this, gSegments);
+        bufferSegments.clear();
+        updateLegendTable(this, bufferSegments);
         if (hexModel) hexModel->setBufferRef(&buffer_);
         if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
         updateActionEnabling();
@@ -674,11 +672,11 @@ void MainWindow::addSegmentAndRefresh(QWidget *parent, qulonglong start, qulongl
     const qulonglong nEnd = start + length; // half-open
 
     QList<BufferSegment> out;
-    out.reserve(gSegments.size() + 1);
+    out.reserve(bufferSegments.size() + 1);
 
     bool anyPartialOverlap = false; // becomes true only if an overlapped old segment has a remainder (left or right)
 
-    for (const auto &seg : std::as_const(gSegments)) {
+    for (const auto &seg : std::as_const(bufferSegments)) {
         const qulonglong sBeg = seg.start;
         const qulonglong sEnd = seg.start + seg.length; // half-open
 
@@ -734,6 +732,6 @@ void MainWindow::addSegmentAndRefresh(QWidget *parent, qulonglong start, qulongl
         coalesced.append(s);
     }
 
-    gSegments = std::move(coalesced);
-    updateLegendTable(parent, gSegments);
+    bufferSegments = std::move(coalesced);
+    updateLegendTable(parent, bufferSegments);
 }

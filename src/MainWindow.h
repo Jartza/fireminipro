@@ -77,11 +77,11 @@ private:
     };
 
     // buffer segment legend
-    static QList<BufferSegment> gSegments;
+    QList<BufferSegment> bufferSegments{};
 
     // buffer legend manipulation
-    static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
-    static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
+    void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
+    void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
 
     // helpers
     QStringList optionFlags() const;
