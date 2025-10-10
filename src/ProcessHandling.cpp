@@ -2,6 +2,8 @@
 #include "ProcessHandling.h"
 #include <QRegularExpression>
 #include <QTextStream>
+#include <QStandardPaths>
+#include <QFileInfo>
 
 ProcessHandling::ProcessHandling(QObject *parent)
     : QObject(parent)
@@ -12,13 +14,33 @@ ProcessHandling::ProcessHandling(QObject *parent)
             this, &ProcessHandling::handleStderr);
     connect(&process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProcessHandling::handleFinished);
+    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); });
 }
 
 void ProcessHandling::startCommand(const QStringList &args) {
     if (process_.state() != QProcess::NotRunning)
         process_.kill();
-    emit logLine("[Run] minipro " + args.join(' '));
-    process_.start("/usr/local/bin/minipro", args);
+
+    // Find the minipro executable robustly
+    QString bin = QStandardPaths::findExecutable("minipro");
+    if (bin.isEmpty()) {
+        const QStringList candidates = {
+            "/opt/homebrew/bin/minipro",   // Apple Silicon Homebrew
+            "/usr/local/bin/minipro",      // Intel Homebrew or manual
+            "/usr/bin/minipro"             // fallback
+        };
+        for (const QString &c : candidates) {
+            if (QFileInfo::exists(c)) { bin = c; break; }
+        }
+    }
+    if (bin.isEmpty()) bin = "minipro"; // let PATH try
+
+    emit logLine("[Run] " + bin + " " + args.join(' '));
+
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.start();
 }
 
 void ProcessHandling::sendResponse(const QString &input) {
@@ -29,16 +51,20 @@ void ProcessHandling::sendResponse(const QString &input) {
 }
 
 void ProcessHandling::handleStdout() {
-    while (process_.canReadLine()) {
-        QString line = QString::fromUtf8(process_.readLine()).trimmed();
-        parseLine(line);
+    const QString all = QString::fromUtf8(process_.readAllStandardOutput());
+    const auto lines = all.split('\n');
+    for (const QString &ln : lines) {
+        const QString t = ln.trimmed();
+        if (!t.isEmpty()) parseLine(t);
     }
 }
 
 void ProcessHandling::handleStderr() {
-    while (process_.canReadLine()) {
-        QString line = QString::fromUtf8(process_.readLine()).trimmed();
-        emit errorLine(line);
+    const QString all = QString::fromUtf8(process_.readAllStandardError());
+    const auto lines = all.split('\n');
+    for (const QString &ln : lines) {
+        const QString t = ln.trimmed();
+        if (!t.isEmpty()) emit errorLine(t);
     }
 }
 
