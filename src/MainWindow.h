@@ -13,9 +13,15 @@ class QCheckBox;
 class QLabel;
 class QProcess;
 class QWidget;
-
-// Forward-declare HexView to avoid circular includes in headers
 class HexView;
+
+// For buffer segment legend storage
+struct BufferSegment {
+    qulonglong start{};
+    qulonglong length{};
+    QString    label;
+    QString    note;
+};
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -69,6 +75,13 @@ private:
     // in-memory buffer
     QByteArray buffer_;
     QString    lastPath_;
+
+    // buffer segment legend
+    static QList<BufferSegment> gSegments;
+
+    // buffer legend manipulation
+    static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
+    static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
 
     // helpers
     QStringList optionFlags() const;

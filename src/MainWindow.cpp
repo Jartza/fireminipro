@@ -29,16 +29,6 @@
 #include "MainWindow.h"
 #include "HexView.h"
 
-struct BufferSegment {
-    qulonglong start{};
-    qulonglong length{};
-    QString    label;   // filename
-    QString    note;    // "", " (partial)", " (overlap)"
-};
-static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs);
-static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label);
-static QList<BufferSegment> gSegments; // simple per-process storage
-
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
@@ -653,7 +643,7 @@ void MainWindow::loadAtOffsetDialog() {
 }
 
 // Buffer segment legend helpers
-static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs) {
+void MainWindow::updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs) {
     auto *legendTable = parent->findChild<QTableWidget*>("bufferLegendTable");
     if (!legendTable) return;
     legendTable->setRowCount(segs.size());
@@ -677,7 +667,7 @@ static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs)
     legendTable->resizeRowsToContents();
 }
 
-static void addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label) {
+void MainWindow::addSegmentAndRefresh(QWidget *parent, qulonglong start, qulonglong length, const QString &label) {
     const qulonglong nBeg = start;
     const qulonglong nEnd = start + length; // half-open
 
