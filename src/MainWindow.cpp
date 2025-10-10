@@ -29,6 +29,8 @@
 #include "MainWindow.h"
 #include "HexView.h"
 
+QList<MainWindow::BufferSegment> MainWindow::gSegments = {};
+
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
