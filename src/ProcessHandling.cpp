@@ -162,7 +162,6 @@ void ProcessHandling::readChipImage(const QString& programmer,
     // Parse device name without @ending, if one exists
     QString deviceName = device.split('@').first().trimmed();
     QString outPath = uniqueTempPath(deviceName);
-    qDebug() << "[Temp path]" << outPath;
     pendingTempPath_ = outPath;
 
     QStringList args;
@@ -303,16 +302,16 @@ void ProcessHandling::handleStdout() {
 
 void ProcessHandling::handleStderr() {
     const QString all = QString::fromLocal8Bit(process_.readAllStandardError());
-    stderrBuffer_.append(all);
 
     const auto lines = all.split('\n');
     for (QString ln : lines) {
         if (ln.isEmpty()) continue;
 
         ln = stripAnsi(ln).trimmed();
+        stderrBuffer_.append(ln);
 
         // (Optional) keep your current logging:
-        emit errorLine(ln);
+        //emit errorLine(ln);
 
         // Parse possible progress from stderr too
         const int pct = extractPercent(ln);

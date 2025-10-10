@@ -14,6 +14,7 @@ class QLabel;
 class QWidget;
 class HexView;
 class QTableWidget;
+class QProgressBar;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -67,6 +68,9 @@ private:
 
     // Hex view model
     HexView *hexModel{};
+
+    // Progress bar
+    QProgressBar* progReadWrite{};
 
     // In-memory buffer
     QByteArray buffer_;

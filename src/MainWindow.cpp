@@ -26,6 +26,7 @@
 #include <QTimer>
 #include <QSortFilterProxyModel>
 #include <QCompleter>
+#include <QProgressBar>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -173,6 +174,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnWrite     = new QPushButton("Write to target", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
     btnLoad      = new QPushButton("Load file to buffer", groupBuffer);
+    progReadWrite = new QProgressBar(groupBuffer);
+
+    progReadWrite->setRange(0, 100);
+    progReadWrite->setValue(0);
+    progReadWrite->setTextVisible(true);
+    
 
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
@@ -183,6 +190,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridB->addWidget(btnWrite,     2, 1, 1, 1);
     gridB->addWidget(chkAsciiSwap, 3, 0, 1, 2);
     gridB->addWidget(lblBufSize,   4, 0, 1, 2);
+    gridB->addWidget(progReadWrite,5, 0, 1, 2);
 
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
@@ -358,6 +366,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(proc, &ProcessHandling::readReady, this, [this](const QString& tempPath){
         // Use the same dialog, but with a preselected path
         loadAtOffsetDialog(tempPath);
+    });
+
+    // Update the bar as progress arrives
+    connect(proc, &ProcessHandling::progress, this, [this](int p) {
+        if (progReadWrite) {
+            if (!progReadWrite->isVisible()) progReadWrite->show();
+            progReadWrite->setValue(p);
+        }
     });
 
     // initial state
