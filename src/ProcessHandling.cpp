@@ -308,7 +308,7 @@ void ProcessHandling::handleStderr() {
         if (ln.isEmpty()) continue;
 
         ln = stripAnsi(ln).trimmed();
-        stderrBuffer_.append(ln);
+        stderrBuffer_.append(ln + "\n");
 
         // (Optional) keep your current logging:
         //emit errorLine(ln);
