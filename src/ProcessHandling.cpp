@@ -4,6 +4,9 @@
 #include <QTextStream>
 #include <QStandardPaths>
 #include <QFileInfo>
+#include <QDir>
+#include <QDateTime>
+#include <QStandardPaths>
 
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
@@ -116,6 +119,44 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
     ci.writeBuf = parseSize("Write buffer size");
 
     return ci;
+}
+
+static QString uniqueTempPath(const QString& base = "fireminipro-read")
+{
+    const QString tmpRoot =
+        QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    const QString ts = QDateTime::currentDateTimeUtc().toString("yyyyMMdd-hhmmss");
+    return QDir(tmpRoot).filePath(base + "-" + ts + ".bin");
+}
+
+void ProcessHandling::readChipImage(const QString& programmer,
+                                    const QString& device,
+                                    const QStringList& extraFlags)
+{
+    const QString bin = resolveMiniproPath();
+
+    // Parse device name without @ending, if one exists
+    QString deviceName = device.split('@').first().trimmed();
+    QString outPath = uniqueTempPath(deviceName);
+    pendingTempPath_ = outPath;
+
+    QStringList args;
+    if (!programmer.trimmed().isEmpty()) {
+        args << "-q" << programmer.trimmed();
+    }
+    args << "-p" << device << "-r" << outPath;
+    args << extraFlags;
+
+    mode_ = Mode::Reading;
+    stdoutBuffer_.clear();
+    stderrBuffer_.clear();
+
+    emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
+
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.start();
 }
 
 ProcessHandling::ProcessHandling(QObject *parent)
@@ -270,6 +311,16 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         const ChipInfo ci = parseChipInfo(merged);
         mode_ = Mode::Idle;
         emit chipInfoReady(ci);
+    } else if (mode_ == Mode::Reading) {
+        const bool ok = (status == QProcess::NormalExit && exitCode == 0);
+        if (ok) {
+            mode_ = Mode::Idle;
+            emit readReady(pendingTempPath_);
+        } else {
+            mode_ = Mode::Idle;
+            emit errorLine(QString("[Read error] exit=%1").arg(exitCode));
+        }
+        pendingTempPath_.clear();
     } else {
         mode_ = Mode::Idle;
     }

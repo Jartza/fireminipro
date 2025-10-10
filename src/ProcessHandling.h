@@ -14,6 +14,11 @@ public:
     void fetchSupportedDevices(const QString &programmer);
     // Fetch information about selected chip (minipro -d "<dev>")
     void fetchChipInfo(const QString &programmer, const QString &device);
+    // Read from chip into buffer (minipro -r <file>)
+    void readChipImage(const QString& programmer,
+                   const QString& device,
+                   const QStringList& extraFlags = {});
+
 
     struct ChipInfo {
         QString baseName;     // e.g. "AM2764A"        (may be empty)
@@ -37,6 +42,8 @@ signals:
     void devicesListed(const QStringList &names);
     // Emitted when chip info is fetched
     void chipInfoReady(const ChipInfo &ci);
+    // Emitted when chip reading is successful
+    void readReady(const QString& tempPath);
 
 private slots:
     void handleStdout();
@@ -45,10 +52,11 @@ private slots:
 
 private:
     // Internal mode to disambiguate generic runs vs scans
-    enum class Mode { Idle, Generic, Scan, DeviceList, ChipInfo };
+    enum class Mode { Idle, Generic, Scan, DeviceList, ChipInfo, Reading };
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
     QString stderrBuffer_;
+    QString pendingTempPath_;
 
     void parseLine(const QString &line);
     QString resolveMiniproPath();
