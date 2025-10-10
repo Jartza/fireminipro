@@ -153,7 +153,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     addRow(r++, "Name:",           chipName);
     addRow(r++, "Package:",        chipPackage);
     addRow(r++, "Memory:",         chipMemory);
-    addRow(r++, "Bus width:",      chipBusWidth);
+    addRow(r++, "Mem width:",      chipBusWidth);
     addRow(r++, "Protocol:",       chipProtocol);
 
     gridC->setColumnStretch(0, 0);
