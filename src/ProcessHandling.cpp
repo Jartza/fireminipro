@@ -7,7 +7,7 @@
 
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
-    //bin.clear();
+    bin.clear();
     if (bin.isEmpty()) {
         const QStringList candidates = {
             "/Users/jartza/src/minipro-vtable/minipro",

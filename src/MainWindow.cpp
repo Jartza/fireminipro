@@ -40,15 +40,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *leftBox = new QWidget(central);
     auto *leftLayout = new QVBoxLayout(leftBox);
 
-    // Targets
-    auto *groupTargets = new QGroupBox("Targets", leftBox);
+    // Target
+    auto *groupTargets = new QGroupBox("Target", leftBox);
     auto *gridT = new QGridLayout(groupTargets);
     comboProgrammer = new QComboBox(groupTargets);
     comboDevice = new QComboBox(groupTargets);
-    btnRescan = new QPushButton("Rescan", groupTargets);
+    btnRescan = new QPushButton("Rescan programmers", groupTargets);
     gridT->addWidget(comboProgrammer, 0, 0, 1, 2);
     gridT->addWidget(comboDevice,     1, 0, 1, 2);
     gridT->addWidget(btnRescan,       2, 0);
+    comboProgrammer->setPlaceholderText("No programmer");
+    comboDevice->setPlaceholderText("No devices");
     groupTargets->setLayout(gridT);
     leftLayout->addWidget(groupTargets);
 
@@ -187,16 +189,20 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             log, &QPlainTextEdit::appendPlainText);
     connect(proc, &ProcessHandling::devicesScanned, this, [this](const QStringList &names){
         if (!log) return;
-        if (names.isEmpty()) {
-            log->appendPlainText("[Scan] No programmer found");
-        } else {
+        if (!names.isEmpty()) {
             for (const auto &n : names) log->appendPlainText("[Scan] " + n);
         }
     });
 
-    // Trigger a device rescan (-k)
+    // Trigger a device rescan
     connect(btnRescan, &QPushButton::clicked, this, [this]{
         if (!proc) return;
+        comboProgrammer->clear();
+        comboProgrammer->setPlaceholderText("No programmer");
+        comboProgrammer->setEnabled(false);
+        comboDevice->clear();
+        comboDevice->setPlaceholderText("No devices");
+        comboDevice->setEnabled(false);
         proc->scanConnectedDevices();
     });
 
@@ -218,7 +224,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             this, [this](const QString &p){
                 if (p.trimmed().isEmpty()) return;
                 comboDevice->clear();
-                comboDevice->setPlaceholderText("Loading…");
+                comboDevice->setPlaceholderText("");
                 comboDevice->setEnabled(false);
                 proc->fetchSupportedDevices(p.trimmed());
             });
@@ -229,9 +235,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 }
 
 void MainWindow::setUiEnabled(bool on) {
-    for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice, btnRescan,
-                                         btnClear, btnSave, btnRead, btnWrite})
-        if (w) w->setEnabled(on);
+    // Enabled at boot
+    for (auto *w : std::vector<QWidget*>{btnRescan, btnClear, btnSave, btnRead, btnWrite})
+        if (w) w->setEnabled(true);
+    // Disabled at boot
+    for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice})
+        if (w) w->setEnabled(false);
 }
 
 void MainWindow::updateActionEnabling() {
@@ -338,6 +347,7 @@ void MainWindow::onDevicesScanned(const QStringList &names)
 
     comboProgrammer->addItems(names);
     comboProgrammer->setCurrentIndex(0);
+    comboProgrammer->setEnabled(true);
     if (log) log->appendPlainText(QString("[Info] Found %1 programmer(s).").arg(names.size()));
 }
 
