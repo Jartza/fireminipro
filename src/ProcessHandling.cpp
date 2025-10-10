@@ -164,7 +164,7 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         QStringList devices = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
         for (QString &s : devices) s = s.trimmed();
         // very light filtering
-        devices.erase(std::remove_if(lines.begin(), lines.end(), [](const QString &s){
+        devices.erase(std::remove_if(devices.begin(), devices.end(), [](const QString &s){
             return s.isEmpty();
         }), devices.end());
         devices.removeDuplicates();
