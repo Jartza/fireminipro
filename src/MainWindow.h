@@ -24,6 +24,8 @@ public:
 private slots:
     void saveBufferToFile();
     void loadAtOffsetDialog();
+    void onDevicesScanned(const QStringList &names);
+    void onDevicesListed(const QStringList &names);
 
 private:
     // left/targets

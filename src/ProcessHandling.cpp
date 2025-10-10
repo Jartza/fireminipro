@@ -7,8 +7,10 @@
 
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
+    //bin.clear();
     if (bin.isEmpty()) {
         const QStringList candidates = {
+            "/Users/jartza/src/minipro-vtable/minipro",
             "/opt/homebrew/bin/minipro",
             "/usr/local/bin/minipro",
             "/usr/bin/minipro"
@@ -100,6 +102,27 @@ void ProcessHandling::scanConnectedDevices() {
     process_.start();
 }
 
+void ProcessHandling::fetchSupportedDevices(const QString &programmer)
+{
+    if (process_.state() != QProcess::NotRunning)
+        process_.kill();
+
+    const QString bin = resolveMiniproPath();
+    // Order: -q <programmer> -l
+    const QStringList args{ "-q", programmer, "-l" };
+
+    emit logLine("[Run] " + bin + " " + args.join(' '));
+
+    mode_ = Mode::DeviceList;
+    stdoutBuffer_.clear();
+    stderrBuffer_.clear();
+
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.start();
+}
+
 void ProcessHandling::sendResponse(const QString &input) {
     if (process_.state() == QProcess::Running) {
         QTextStream(&process_).operator<<(input + "\n");
@@ -108,10 +131,10 @@ void ProcessHandling::sendResponse(const QString &input) {
 }
 
 void ProcessHandling::handleStdout() {
-    const QByteArray raw = process_.readAllStandardOutput();
+    const QString raw = QString::fromLocal8Bit(process_.readAllStandardOutput());
     stdoutBuffer_.append(raw);
 
-    const auto lines = QString::fromLocal8Bit(raw).split('\n');
+    const auto lines = raw.split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
         if (!t.isEmpty()) parseLine(t);
@@ -133,6 +156,19 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     if (mode_ == Mode::Scan) {
         const QStringList names = parseProgrammerList(stderrBuffer_);
         emit devicesScanned(names);
+        mode_ = Mode::Idle;
+        stdoutBuffer_.clear();
+    } else if (mode_ == Mode::DeviceList) {
+        // Devices are printed on STDOUT by `-l`
+        QStringList lines = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
+        for (QString &s : lines) s = s.trimmed();
+        // very light filtering
+        lines.erase(std::remove_if(lines.begin(), lines.end(), [](const QString &s){
+            return s.isEmpty();
+        }), lines.end());
+        lines.removeDuplicates();
+
+        emit devicesListed(lines);
         mode_ = Mode::Idle;
         stdoutBuffer_.clear();
     } else {

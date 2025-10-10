@@ -23,6 +23,7 @@
 #include <QPainter>
 #include <QTableWidget>
 #include <QHeaderView>
+#include <QTimer>
 #include <algorithm>
 
 #include "MainWindow.h"
@@ -193,11 +194,37 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         }
     });
 
-    // Trigger a real scan (-k) and log results via devicesScanned
+    // Trigger a device rescan (-k)
     connect(btnRescan, &QPushButton::clicked, this, [this]{
         if (!proc) return;
         proc->scanConnectedDevices();
     });
+
+    // Populate dropdown when scan completes
+    connect(proc, &ProcessHandling::devicesScanned, this, &MainWindow::onDevicesScanned);
+
+    // Kick off one initial scan on startup (after the window is up)
+    QTimer::singleShot(100, this, [this]{
+        if (proc) proc->scanConnectedDevices();
+    });
+
+    // When a scan completes, we already populate programmers:
+    connect(proc, &ProcessHandling::devicesScanned,
+            this, &MainWindow::onDevicesScanned);
+
+    // Populate device list when fetched
+    connect(proc, &ProcessHandling::devicesListed,
+            this, &MainWindow::onDevicesListed);
+
+    // When the selected programmer changes, fetch its device list
+    connect(comboProgrammer, &QComboBox::currentTextChanged,
+            this, [this](const QString &p){
+                if (p.trimmed().isEmpty()) return;
+                comboDevice->clear();
+                comboDevice->setPlaceholderText("Loading…");
+                comboDevice->setEnabled(false);
+                proc->fetchSupportedDevices(p.trimmed());
+            });
 
     // initial state
     setUiEnabled(true);
@@ -298,6 +325,43 @@ void MainWindow::patchBuffer(int offset, const QByteArray &data, char padByte) {
                                        hexModel->index(lastRow, hexModel->columnCount() - 1));
         }
     }
+}
+
+void MainWindow::onDevicesScanned(const QStringList &names)
+{
+    // Refresh the programmer dropdown
+    comboProgrammer->clear();
+
+    if (names.isEmpty()) {
+        comboProgrammer->setPlaceholderText("No programmer found");
+        if (log) log->appendPlainText("[Error] No programmer found.");
+        // (Optional) disable actions that need a programmer here
+        return;
+    }
+
+    comboProgrammer->addItems(names);
+    comboProgrammer->setCurrentIndex(0);
+    if (log) log->appendPlainText(QString("[Info] Found %1 programmer(s).").arg(names.size()));
+}
+
+void MainWindow::onDevicesListed(const QStringList &names)
+{
+    comboDevice->clear();
+
+    if (names.isEmpty()) {
+        comboDevice->setPlaceholderText("No devices for this programmer");
+        comboDevice->setEnabled(false);
+        if (log) log->appendPlainText("[Error] No devices found for selected programmer.");
+        return;
+    }
+
+    QStringList sorted = names;
+    sorted.sort(Qt::CaseInsensitive);
+    comboDevice->addItems(sorted);
+    comboDevice->setCurrentIndex(0);
+    comboDevice->setEnabled(true);
+
+    if (log) log->appendPlainText(QString("[Info] Loaded %1 devices.").arg(sorted.size()));
 }
 
 // Simple graphical preview bar for Load-at-Offset

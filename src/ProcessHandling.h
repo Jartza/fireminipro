@@ -12,6 +12,7 @@ public:
     void sendResponse(const QString &input);
     // Fire-and-forget scan for connected programmers (minipro -k)
     void scanConnectedDevices();
+    void fetchSupportedDevices(const QString &programmer);
 
 signals:
     void logLine(const QString &text);     // Normal output
@@ -21,6 +22,7 @@ signals:
     void finished(int exitCode, QProcess::ExitStatus status);
     // Emitted after scanConnectedDevices() completes
     void devicesScanned(const QStringList &names);
+    void devicesListed(const QStringList &names);
 
 private slots:
     void handleStdout();
@@ -29,7 +31,7 @@ private slots:
 
 private:
     // Internal mode to disambiguate generic runs vs scans
-    enum class Mode { Idle, Generic, Scan };
+    enum class Mode { Idle, Generic, Scan, DeviceList };
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
     QString stderrBuffer_;
