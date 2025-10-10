@@ -15,14 +15,6 @@ class QProcess;
 class QWidget;
 class HexView;
 
-// For buffer segment legend storage
-struct BufferSegment {
-    qulonglong start{};
-    qulonglong length{};
-    QString    label;
-    QString    note;
-};
-
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -75,6 +67,14 @@ private:
     // in-memory buffer
     QByteArray buffer_;
     QString    lastPath_;
+
+    // For buffer segment legend storage
+    struct BufferSegment {
+        qulonglong start{};
+        qulonglong length{};
+        QString    label;
+        QString    note;
+    };
 
     // buffer segment legend
     static QList<BufferSegment> gSegments;
