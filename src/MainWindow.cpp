@@ -28,9 +28,9 @@
 #include <QCompleter>
 #include <algorithm>
 
+#include "ProcessHandling.h"
 #include "MainWindow.h"
 #include "HexView.h"
-#include "ProcessHandling.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
@@ -113,6 +113,39 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     comboDevice->lineEdit()->installEventFilter(this);
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
+
+    // Chip information (between Target and Buffer)
+    auto *groupChipInfo = new QGroupBox("Chip information", leftBox);
+    auto *gridC = new QGridLayout(groupChipInfo);
+
+    // left column (keys), right column (values)
+    auto addRow = [&](int r, const char *key, QLabel *&valueOut) {
+        auto *k = new QLabel(QString::fromUtf8(key), groupChipInfo);
+        k->setFont(small);
+        k->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        valueOut = new QLabel("-", groupChipInfo);
+        valueOut->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        gridC->addWidget(k, r, 0);
+        gridC->addWidget(valueOut, r, 1);
+    };
+
+    // rows
+    int r = 0;
+    addRow(r++, "Name:",           chipName);
+    addRow(r++, "Package:",        chipPackage);
+    addRow(r++, "Memory:",         chipMemory);
+    addRow(r++, "Bus width:",      chipBusWidth);
+    addRow(r++, "Protocol:",       chipProtocol);
+    addRow(r++, "Read buffer:",    chipReadBuf);
+    addRow(r++, "Write buffer:",   chipWriteBuf);
+
+    gridC->setColumnStretch(0, 0);
+    gridC->setColumnStretch(1, 1);
+    groupChipInfo->setLayout(gridC);
+    leftLayout->addWidget(groupChipInfo);
+
+    // start clean
+    //clearChipInfo();
 
     // Buffer group
     auto *groupBuffer = new QGroupBox("Buffer", leftBox);
@@ -339,6 +372,31 @@ QStringList MainWindow::optionFlags() const {
     if (chkPinCheck->isChecked())      f << "--pin_check";
     if (chkHardwareCheck->isChecked()) f << "--hardware_check";
     return f;
+}
+
+static inline QString prettyBytes(qulonglong b) {
+    if (!b) return "-";
+    return QString("%1 (0x%2)")
+            .arg(QLocale().toString(b))
+            .arg(QString::number(b, 16).toUpper());
+}
+
+void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
+{
+    // graceful fallbacks for partial info
+    chipName     ->setText(ci.baseName.isEmpty()   ? "-" : ci.baseName);
+    chipPackage  ->setText(ci.package.isEmpty()    ? "-" : ci.package);
+    chipMemory   ->setText(prettyBytes(ci.bytes));
+    chipBusWidth ->setText(ci.wordBits > 0         ? QString("%1-bit").arg(ci.wordBits) : "-");
+    chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
+    chipReadBuf  ->setText(ci.readBuf  > 0         ? prettyBytes(ci.readBuf)  : "-");
+    chipWriteBuf ->setText(ci.writeBuf > 0         ? prettyBytes(ci.writeBuf) : "-");
+}
+
+void MainWindow::clearChipInfo()
+{
+    ProcessHandling::ChipInfo blank; // all empty/zero
+    updateChipInfo(blank);
 }
 
 void MainWindow::saveBufferToFile() {

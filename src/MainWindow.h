@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QByteArray>
 #include <QStringList>
+#include "ProcessHandling.h"
 
 class QComboBox;
 class QPushButton;
@@ -13,7 +14,6 @@ class QLabel;
 class QWidget;
 class HexView;
 class QTableWidget;
-class ProcessHandling;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -28,12 +28,21 @@ private slots:
     void onDevicesListed(const QStringList &names);
 
 private:
-    // left/targets
+    // Target and device
     QComboBox   *comboProgrammer{};
     QComboBox   *comboDevice{};
     QPushButton *btnRescan{};
 
-    // buffer group
+    // Chip information
+    QLabel      *chipName{};
+    QLabel      *chipPackage{};
+    QLabel      *chipMemory{};
+    QLabel      *chipBusWidth{};
+    QLabel      *chipProtocol{};
+    QLabel      *chipReadBuf{};
+    QLabel      *chipWriteBuf{};
+
+    // Buffer group
     QPushButton *btnClear{};
     QPushButton *btnLoad{};
     QPushButton *btnSave{};
@@ -42,7 +51,7 @@ private:
     QCheckBox   *chkAsciiSwap{};
     QLabel      *lblBufSize{};
 
-    // eeprom options
+    // Eeprom options
     QCheckBox *chkBlankCheck{};
     QCheckBox *chkErase{};
     QCheckBox *chkSkipVerify{};
@@ -52,18 +61,18 @@ private:
     QCheckBox *chkPinCheck{};
     QCheckBox *chkHardwareCheck{};
 
-    // views
+    // Views
     QTableView     *tableHex{};
     QPlainTextEdit *log{};
 
-    // hex model
+    // Hex view model
     HexView *hexModel{};
 
-    // in-memory buffer
+    // In-memory buffer
     QByteArray buffer_;
     QString    lastPath_;
 
-    // For buffer segment legend storage
+    // Buffer segment legend storage
     struct BufferSegment {
         qulonglong start{};
         qulonglong length{};
@@ -71,21 +80,23 @@ private:
         QString    note;
     };
 
-    // buffer segment legend
+    // Buffer segment legend
     QList<BufferSegment> bufferSegments{};
     QTableWidget *legendTable{};
 
     // Process handling helper
     ProcessHandling *proc{};
 
-    // buffer legend manipulation
+    // Buffer legend manipulation
     void updateLegendTable();
     void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);
 
-    // helpers
+    // Helpers
     QStringList optionFlags() const;
     void setUiEnabled(bool on);
     void updateActionEnabling();
+    void updateChipInfo(const ProcessHandling::ChipInfo &ci);
+    void clearChipInfo();
 
     // parsing / buffer helpers
     bool parseSizeLike(const QString &in, qulonglong &out);

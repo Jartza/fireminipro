@@ -1,4 +1,3 @@
-// src/ProcessHandling.h
 #pragma once
 #include <QObject>
 #include <QProcess>
@@ -13,6 +12,16 @@ public:
     // Fire-and-forget scan for connected programmers (minipro -k)
     void scanConnectedDevices();
     void fetchSupportedDevices(const QString &programmer);
+
+    struct ChipInfo {
+        QString baseName;     // e.g. "AM2764A"        (may be empty)
+        QString package;      // e.g. "DIP28"          (may be empty)
+        quint64 bytes = 0;    // 0 if unknown
+        int     wordBits = 0; // 8 for byte-wide, 16 for 16-bit; 0 if unknown
+        QString protocol;     // "0x07" or empty
+        int     readBuf = 0;  // bytes; 0 if unknown
+        int     writeBuf = 0; // bytes; 0 if unknown
+    };
 
 signals:
     void logLine(const QString &text);     // Normal output
