@@ -11,11 +11,13 @@ set(SOURCES
     src/main.cpp
     src/MainWindow.cpp
     src/HexView.cpp
+    src/ProcessHandling.cpp
 )
 
 set(HEADERS
     src/MainWindow.h
     src/HexView.h
+    src/ProcessHandling.h
 )
 
 qt_add_executable(${PROJECT_NAME}
