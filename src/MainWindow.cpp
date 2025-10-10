@@ -179,7 +179,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
-    
+
 
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
@@ -312,6 +312,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         if (!names.isEmpty()) {
             for (const auto &n : names) log->appendPlainText("[Scan] " + n);
         }
+    });
+
+    // ASCII byteswap toggle
+    connect(chkAsciiSwap, &QCheckBox::toggled, this, [this](bool on){
+        if (hexModel) hexModel->setSwapAscii16(on);
     });
 
     // Trigger a device rescan
