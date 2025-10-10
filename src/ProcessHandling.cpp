@@ -314,10 +314,10 @@ void ProcessHandling::handleStderr() {
         // (Optional) keep your current logging:
         emit errorLine(ln);
 
-        // NEW: peek percent and dump to qDebug() for now
+        // Parse possible progress from stderr too
         const int pct = extractPercent(ln);
-        if (pct >= 0) {
-            qDebug() << "[progress]" << pct;
+        if (pct >= 0 && pct <= 100) {
+            emit progress(pct);
         }
     }
 }
@@ -347,7 +347,6 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     } else if (mode_ == Mode::Reading) {
         const bool ok = (status == QProcess::NormalExit && exitCode == 0);
         // print debug info
-        qDebug() << "[Process finished] exit=" << exitCode << "status=" << status;
         if (ok) {
             mode_ = Mode::Idle;
             emit readReady(pendingTempPath_);
