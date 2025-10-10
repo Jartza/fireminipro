@@ -200,9 +200,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         proc->scanConnectedDevices();
     });
 
-    // Populate dropdown when scan completes
-    connect(proc, &ProcessHandling::devicesScanned, this, &MainWindow::onDevicesScanned);
-
     // Kick off one initial scan on startup (after the window is up)
     QTimer::singleShot(100, this, [this]{
         if (proc) proc->scanConnectedDevices();

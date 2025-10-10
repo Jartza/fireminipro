@@ -95,6 +95,7 @@ void ProcessHandling::scanConnectedDevices() {
 
     mode_ = Mode::Scan;
     stdoutBuffer_.clear();
+    stderrBuffer_.clear();
 
     process_.setProgram(bin);
     process_.setArguments(args);
@@ -160,15 +161,15 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         stdoutBuffer_.clear();
     } else if (mode_ == Mode::DeviceList) {
         // Devices are printed on STDOUT by `-l`
-        QStringList lines = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
-        for (QString &s : lines) s = s.trimmed();
+        QStringList devices = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
+        for (QString &s : devices) s = s.trimmed();
         // very light filtering
-        lines.erase(std::remove_if(lines.begin(), lines.end(), [](const QString &s){
+        devices.erase(std::remove_if(lines.begin(), lines.end(), [](const QString &s){
             return s.isEmpty();
-        }), lines.end());
-        lines.removeDuplicates();
+        }), devices.end());
+        devices.removeDuplicates();
 
-        emit devicesListed(lines);
+        emit devicesListed(devices);
         mode_ = Mode::Idle;
         stdoutBuffer_.clear();
     } else {
