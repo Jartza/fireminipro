@@ -24,7 +24,6 @@ public:
     ~MainWindow() override = default;
 
 private slots:
-    void loadBufferFromFile();
     void saveBufferToFile();
     void readFromDevice();
     void writeToDevice();

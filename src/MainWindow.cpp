@@ -69,17 +69,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnRead      = new QPushButton("Read target",  groupBuffer);
     btnWrite     = new QPushButton("Write target", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
+    btnLoad      = new QPushButton("Load file to buffer", groupBuffer);
 
-    // layout (Buffer)
-    // Desired order:
-    //  Row 0: Clear & Load…  (spans 2 cols)
-    //  Row 1: Load at offset… (left)   | Save (right)
-    //  Row 2: ASCII byteswap (16-bit)  (spans 2 cols)
-    //  Row 3: Size: ...                 (spans 2 cols)
-    //  Row 4: Modified: ...             (spans 2 cols)
-
-    // ensure extra actions and labels exist
-    btnLoad    = new QPushButton("Load binary to buffer", groupBuffer);
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
     gridB->addWidget(btnLoad,      0, 0, 1, 2);
@@ -240,38 +231,6 @@ QStringList MainWindow::optionFlags() const {
     if (chkPinCheck->isChecked())      f << "--pin_check";
     if (chkHardwareCheck->isChecked()) f << "--hardware_check";
     return f;
-}
-
-// --- Slots ---
-
-void MainWindow::loadBufferFromFile() {
-    const QString path = QFileDialog::getOpenFileName(this, tr("Load image"), lastPath_,
-        tr("All files (*);;Binary (*.bin);;Intel HEX (*.hex *.ihex *.ihx);;S-Record (*.s19 *.srec)"));
-    if (path.isEmpty()) return;
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly)) {
-        log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
-        return;
-    }
-    buffer_ = f.readAll();
-
-    // Reset legend to this single file
-    gSegments.clear();
-    addSegmentAndRefresh(this, 0, static_cast<qulonglong>(buffer_.size()), QFileInfo(path).fileName());
-
-    // Refresh Hex View
-    if (hexModel) {
-        hexModel->setBufferRef(&buffer_); // begin/end reset inside ensures view updates
-    }
-
-    lastPath_ = QFileInfo(path).absolutePath();
-    log->appendPlainText(QString("[Loaded] %1 bytes from %2").arg(buffer_.size()).arg(path));
-    updateActionEnabling();
-
-    if (lblBufSize)
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
-                            .arg(QLocale().toString(buffer_.size()))
-                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
 }
 
 void MainWindow::saveBufferToFile() {
@@ -513,10 +472,9 @@ private:
     qulonglong padLen_{};
 };
 
-// --- UI: Load at offset dialog --------------------------------------------
-
+// Load file to buffer at user-specified offset, with optional padding
 void MainWindow::loadAtOffsetDialog() {
-    // 1) Pick file FIRST so we know its size and can default length accordingly
+    // Pick file first so we know its size and can default length accordingly
     const QString path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,
         tr("All files (*);;Binary (*.bin)"));
     if (path.isEmpty()) return;
@@ -531,8 +489,8 @@ void MainWindow::loadAtOffsetDialog() {
 
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
-    dlg.setWindowTitle(tr("Load at offset"));
-    dlg.setMinimumSize(560, 280);          // give headroom for large numbers
+    dlg.setWindowTitle(tr("Load file to buffer"));
+    dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
     auto *grid = new QGridLayout(&dlg);
     auto *leftForm = new QFormLayout();
@@ -694,7 +652,7 @@ void MainWindow::loadAtOffsetDialog() {
     updateActionEnabling();
 }
 
-// --- Buffer segment legend helpers ---
+// Buffer segment legend helpers
 static void updateLegendTable(QWidget *parent, const QList<BufferSegment> &segs) {
     auto *legendTable = parent->findChild<QTableWidget*>("bufferLegendTable");
     if (!legendTable) return;
