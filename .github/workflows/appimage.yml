@@ -19,8 +19,10 @@ jobs:
           if [ -x /usr/lib/qt6/bin/qmake6 ]; then
             sudo ln -sf /usr/lib/qt6/bin/qmake6 /usr/local/bin/qmake
             sudo ln -sf /usr/lib/qt6/bin/qmake6 /usr/lib/qt6/bin/qmake
+            sudo ln -sf /usr/lib/qt6/bin/qmake6 /usr/bin/qmake
           elif [ -x /usr/lib/qt6/bin/qmake ]; then
             sudo ln -sf /usr/lib/qt6/bin/qmake /usr/local/bin/qmake
+            sudo ln -sf /usr/lib/qt6/bin/qmake /usr/bin/qmake
           fi
           qmake -v || true
       - name: Build
@@ -36,12 +38,14 @@ jobs:
         env:
           QMAKE: /usr/lib/qt6/bin/qmake6
           LINUXDEPLOY_QT_QMAKE: /usr/lib/qt6/bin/qmake6
+          LINUXDEPLOY_PLUGIN_QT_QMAKE: /usr/lib/qt6/bin/qmake6
           LINUXDEPLOY_QT_AUTO_INCLUDE_MODULES: 1
           QT_SELECT: qt6
         run: |
           export PATH=/usr/lib/qt6/bin:$PATH
           export QMAKE=/usr/lib/qt6/bin/qmake6
           export LINUXDEPLOY_QT_QMAKE=/usr/lib/qt6/bin/qmake6
+          export LINUXDEPLOY_PLUGIN_QT_QMAKE=/usr/lib/qt6/bin/qmake6
           mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
           cp build/fireminipro AppDir/usr/bin/
           printf '%s\n' \
