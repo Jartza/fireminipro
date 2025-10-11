@@ -356,6 +356,8 @@ void ProcessHandling::handleStdout() {
             emit errorLine(ln);
         } else if (ln.contains("failed", Qt::CaseInsensitive)) {
             emit errorLine(ln);
+        } else if (ln.contains("can't", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
         } else if (ln.contains("is blank", Qt::CaseInsensitive)) {
             emit logLine(ln);
         } else if (ln.contains("success", Qt::CaseInsensitive)) {
