@@ -29,6 +29,7 @@ jobs:
         env:
           QMAKE: /usr/local/bin/qmake
         run: |
+          export PATH=/usr/lib/qt6/bin:$PATH
           mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
           cp build/fireminipro AppDir/usr/bin/
           printf '%s\n' \
