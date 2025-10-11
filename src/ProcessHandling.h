@@ -37,9 +37,12 @@ public:
     };
 
 signals:
-    void logLine(const QString &text);     // Normal output
-    void errorLine(const QString &text);   // Error output
-    void progress(int percent);            // Parsed progress %
+    // Normal log output
+    void logLine(const QString &text);
+    // Error log output
+    void errorLine(const QString &text);
+    // Parsed progress %
+    void progress(int percent, const QString& phase);
     void promptDetected(const QString &promptText);
     void finished(int exitCode, QProcess::ExitStatus status);
     // Emitted after scanConnectedDevices() completes
@@ -74,7 +77,6 @@ private:
     QString stderrBuffer_;
     QString pendingTempPath_;
 
-    void parseLine(const QString &line);
     QString resolveMiniproPath();
     QStringList parseProgrammerList(const QString &text) const;
     ChipInfo parseChipInfo(const QString &text) const;

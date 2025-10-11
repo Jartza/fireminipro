@@ -193,6 +193,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
+    progReadWrite->setFormat(QStringLiteral("Idle"));
     progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
@@ -418,10 +419,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     });
 
     // Update the bar as progress arrives
-    connect(proc, &ProcessHandling::progress, this, [this](int p) {
+    connect(proc, &ProcessHandling::progress, this, 
+        [this](int pct, const QString &label) {
         if (progReadWrite) {
             if (!progReadWrite->isVisible()) progReadWrite->show();
-            progReadWrite->setValue(p);
+            progReadWrite->setValue(pct);
+            progReadWrite->setFormat(label.isEmpty() ? QStringLiteral("%p%") : label + " %p%");
         }
     });
 
@@ -452,6 +455,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         // TODO: replace with proc->testLogic(p, d, optionFlags());
         if (log) log->appendPlainText("[Op] Logic test requested.");
     });
+
+    // When process finishes, ensure progress bar is at 100% and shows "Idle"
+    connect(proc, &ProcessHandling::finished, this,
+            [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
+                if (!progReadWrite) return;
+                progReadWrite->setValue(100);
+                progReadWrite->setFormat(QStringLiteral("Idle"));
+                progReadWrite->setTextVisible(true);
+            });
 
     // initial state
     setUiEnabled(true);

@@ -18,9 +18,12 @@ static inline QString stripAnsi(QString s) {
 // Return 0–100 if a % is found, otherwise -1
 static int extractPercent(const QString& line)
 {
-    if (line.endsWith("ms  OK", Qt::CaseInsensitive)) {
+    // Treat “... OK” endings as 100%, e.g. “123.4 ms  OK”, “12.0 Sec OK”, “Verification OK”
+    static const QRegularExpression okTail(
+        R"((?:ms|sec)?\s*ok\s*$|verification\s*ok\s*$)",
+        QRegularExpression::CaseInsensitiveOption);
+    if (okTail.match(line).hasMatch())
         return 100;
-    }
 
     static QRegularExpression re(R"((\d{1,3})\s*%)");
     auto m = re.match(line);
@@ -29,6 +32,18 @@ static int extractPercent(const QString& line)
     bool ok = false;
     int pct = m.captured(1).toInt(&ok);
     return (ok && pct >= 0 && pct <= 100) ? pct : -1;
+}
+
+static QString detectPhaseText(const QString& line)
+{
+    static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression rd(R"(\bReading\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+
+    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
+    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
+    return {};
 }
 } // namespace
 
@@ -338,7 +353,7 @@ void ProcessHandling::handleStdout() {
     const auto lines = raw.split('\n');
     for (const QString &ln : lines) {
         const QString t = ln.trimmed();
-        if (!t.isEmpty()) parseLine(t);
+        if (!t.isEmpty()) emit logLine(t);
     }
 }
 
@@ -357,8 +372,9 @@ void ProcessHandling::handleStderr() {
 
         // Parse possible progress from stderr too
         const int pct = extractPercent(ln);
+        const QString phase = detectPhaseText(ln);
         if (pct >= 0 && pct <= 100) {
-            emit progress(pct);
+            emit progress(pct, phase);
         }
     }
 }
@@ -410,22 +426,4 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     stderrBuffer_.clear();
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
-}
-
-void ProcessHandling::parseLine(const QString &line) {
-    emit logLine(line);
-
-    // Match progress lines like "Writing: 25.0%"
-    static QRegularExpression progressRe(R"(.*?(\d+(?:\.\d+)?)%)");
-    auto m = progressRe.match(line);
-    if (m.hasMatch()) {
-        bool ok = false;
-        int pct = int(m.captured(1).toDouble(&ok));
-        if (ok) emit progress(pct);
-    }
-
-    // Detect prompt: anything ending with [y/n]
-    if (line.contains("[y/n]", Qt::CaseInsensitive)) {
-        emit promptDetected(line);
-    }
 }
