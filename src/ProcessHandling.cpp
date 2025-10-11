@@ -203,13 +203,12 @@ void ProcessHandling::readChipImage(const QString& programmer,
 
     mode_ = Mode::Reading;
     stdoutBuffer_.clear();
-    stderrBuffer_.clear();
 
     emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -231,13 +230,12 @@ void ProcessHandling::writeChipImage(const QString& programmer,
 
     mode_ = Mode::Writing;
     stdoutBuffer_.clear();
-    stderrBuffer_.clear();
 
     emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -246,8 +244,6 @@ ProcessHandling::ProcessHandling(QObject *parent)
 {
     connect(&process_, &QProcess::readyReadStandardOutput,
             this, &ProcessHandling::handleStdout);
-    connect(&process_, &QProcess::readyReadStandardError,
-            this, &ProcessHandling::handleStderr);
     connect(&process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProcessHandling::handleFinished);
     connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); });
@@ -268,7 +264,7 @@ void ProcessHandling::startCommand(const QStringList &args) {
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -282,11 +278,10 @@ void ProcessHandling::scanConnectedDevices() {
 
     mode_ = Mode::Scan;
     stdoutBuffer_.clear();
-    stderrBuffer_.clear();
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -303,11 +298,10 @@ void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 
     mode_ = Mode::DeviceList;
     stdoutBuffer_.clear();
-    stderrBuffer_.clear();
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -328,11 +322,10 @@ void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &de
 
     mode_ = Mode::ChipInfo;
     stdoutBuffer_.clear();
-    stderrBuffer_.clear();
 
     process_.setProgram(bin);
     process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
 }
 
@@ -344,33 +337,27 @@ void ProcessHandling::sendResponse(const QString &input) {
 }
 
 void ProcessHandling::handleStdout() {
-    const QString raw = QString::fromLocal8Bit(process_.readAllStandardOutput());
-    stdoutBuffer_.append(raw);
-
-    //TODO remove
-    return;
-
-    const auto lines = raw.split('\n');
-    for (const QString &ln : lines) {
-        const QString t = ln.trimmed();
-        if (!t.isEmpty()) emit logLine(t);
-    }
-}
-
-void ProcessHandling::handleStderr() {
-    const QString all = QString::fromLocal8Bit(process_.readAllStandardError());
+    const QString all = QString::fromLocal8Bit(process_.readAllStandardOutput());
 
     const auto lines = all.split('\n');
     for (QString ln : lines) {
         if (ln.isEmpty()) continue;
 
         ln = stripAnsi(ln).trimmed();
-        stderrBuffer_.append(ln + "\n");
+        stdoutBuffer_.append(ln + "\n");
 
-        // (Optional) keep your current logging:
-        //emit errorLine(ln);
+        // We want to log only specific output
+        if (ln.contains("error", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
+        } else if (ln.contains("warning", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
+        } else if (ln.contains("invalid", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
+        } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
+            emit logLine(ln);
+        }
 
-        // Parse possible progress from stderr too
+        // Parse possible progress from stdout too
         const int pct = extractPercent(ln);
         const QString phase = detectPhaseText(ln);
         if (pct >= 0 && pct <= 100) {
@@ -381,7 +368,7 @@ void ProcessHandling::handleStderr() {
 
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
     if (mode_ == Mode::Scan) {
-        const QStringList names = parseProgrammerList(stderrBuffer_);
+        const QStringList names = parseProgrammerList(stdoutBuffer_);
         mode_ = Mode::Idle;
         emit devicesScanned(names);
     } else if (mode_ == Mode::DeviceList) {
@@ -397,8 +384,7 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         mode_ = Mode::Idle;
         emit devicesListed(devices);
     } else if (mode_ == Mode::ChipInfo) {
-        const QString merged = stdoutBuffer_ + "\n" + stderrBuffer_;
-        const ChipInfo ci = parseChipInfo(merged);
+        const ChipInfo ci = parseChipInfo(stdoutBuffer_);
         mode_ = Mode::Idle;
         emit chipInfoReady(ci);
     } else if (mode_ == Mode::Reading) {
@@ -423,7 +409,6 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     } else {
         mode_ = Mode::Idle;
     }
-    stderrBuffer_.clear();
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
 }

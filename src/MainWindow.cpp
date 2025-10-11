@@ -28,6 +28,7 @@
 #include <QCompleter>
 #include <QProgressBar>
 #include <QStyleFactory>
+#include <QFileInfo>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -1008,7 +1009,7 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
                          .arg(QLocale().toString(effLen))
                          .arg(QString::number(off, 16).toUpper())
-                         .arg(path));
+                         .arg(QFileInfo(path).fileName()));
 
     if (lblBufSize)
         lblBufSize->setText(QString("Size: %1 (0x%2)")

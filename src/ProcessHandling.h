@@ -57,7 +57,6 @@ signals:
 
 private slots:
     void handleStdout();
-    void handleStderr();
     void handleFinished(int exitCode, QProcess::ExitStatus status);
 
 private:
@@ -74,7 +73,6 @@ private:
 
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
-    QString stderrBuffer_;
     QString pendingTempPath_;
 
     QString resolveMiniproPath();
