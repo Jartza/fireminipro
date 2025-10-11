@@ -10,6 +10,7 @@ public:
     void sendResponse(const QString &input);
     // Fire-and-forget scan for connected programmers (minipro -k)
     void scanConnectedDevices();
+    // Fetch supported devices for a given programmer (minipro -q <programmer> -l)
     void fetchSupportedDevices(const QString &programmer);
     // Fetch information about selected chip (minipro -d "<dev>")
     void fetchChipInfo(const QString &programmer, const QString &device);

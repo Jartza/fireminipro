@@ -104,18 +104,23 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         });
 
     // fetch only on user action. Avoid fetching on every text change
-    // to avoid spamming when user is in the middle of typing to filter
-    connect(comboDevice, qOverload<int>(&QComboBox::activated),
-        this, [this](int idx){
-            if (idx >= 0 && proc) {
-                const QString p = comboProgrammer->currentText().trimmed();
-                const QString d = comboDevice->itemText(idx).trimmed();
-                if (!p.isEmpty() && !d.isEmpty()) {
-                    clearChipInfo();
-                    proc->fetchChipInfo(p, d);
-                }
-            }
-        });
+    // to avoid spamming processes when user is in the middle of typing to filter
+    connect(completer, qOverload<const QString&>(&QCompleter::activated), this, [this](const QString &text){
+        // Find exact item index (case-insensitive)
+        int idx = -1;
+        for (int i = 0; i < comboDevice->count(); ++i) {
+            if (comboDevice->itemText(i).compare(text, Qt::CaseInsensitive) == 0) { idx = i; break; }
+        }
+        if (idx < 0 || !proc) return;
+
+        comboDevice->setCurrentIndex(idx);   // reflect selection in the UI
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->itemText(idx).trimmed();
+        if (!p.isEmpty() && !d.isEmpty()) {
+            clearChipInfo();
+            proc->fetchChipInfo(p, d);
+        }
+    });
 
     // When user types in the combobox, filter the list
     connect(comboDevice->lineEdit(),
@@ -374,13 +379,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             this, &MainWindow::onDevicesListed);
 
     // When the selected programmer changes, fetch its device list
-    connect(comboProgrammer, &QComboBox::currentTextChanged,
-            this, [this](const QString &p){
-                if (p.trimmed().isEmpty()) return;
+    connect(comboProgrammer, &QComboBox::currentIndexChanged,
+            this, [this](int index){
+                if (index == -1) return;
+                const QString p = comboProgrammer->itemText(index).trimmed();
                 comboDevice->clear();
                 comboDevice->setPlaceholderText("");
                 comboDevice->setEnabled(false);
-                proc->fetchSupportedDevices(p.trimmed());
+                proc->fetchSupportedDevices(p);
             });
 
     // Fetch chip info
@@ -474,18 +480,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
-  if (obj == comboDevice->lineEdit()) {
-    auto *edit = comboDevice->lineEdit();
+    if (obj == comboDevice->lineEdit()) {
+        auto *edit = comboDevice->lineEdit();
 
-    // First click inside the edit clears it
-    if (e->type() == QEvent::MouseButtonPress) {
-      if (edit->property("clearOnFirstClick").toBool()) {
-        edit->clear();
-        edit->setProperty("clearOnFirstClick", false);
-      }
+        // First click inside the edit clears it
+        if (e->type() == QEvent::MouseButtonPress) {
+            if (edit->property("clearOnFirstClick").toBool()) {
+                edit->clear();
+                edit->setProperty("clearOnFirstClick", false);
+            }
+        }
     }
-  }
-  return QMainWindow::eventFilter(obj, e);
+
+    return QMainWindow::eventFilter(obj, e);
 }
 
 

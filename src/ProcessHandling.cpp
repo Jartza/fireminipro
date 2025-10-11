@@ -198,7 +198,7 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
 void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
 {
     // If something is still running, stop it (keeps current behavior)
-    if (process_.state() != QProcess::NotRunning) {
+    if (mode_ != Mode::Idle || process_.state() == QProcess::Running) {
         process_.kill();
         process_.waitForFinished(3000);
     }
