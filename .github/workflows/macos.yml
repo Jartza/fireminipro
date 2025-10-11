@@ -1,0 +1,36 @@
+# .github/workflows/macos.yml
+name: macOS DMG
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          brew update
+          brew install cmake ninja qt@6
+      - name: Configure & Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja -C build
+      - name: Deploy Qt into .app and package DMG
+        run: |
+          /opt/homebrew/opt/qt/bin/macdeployqt build/fireminipro.app -verbose=2
+          cat >> CMakeLists.txt <<'CPACK'
+          set(CPACK_GENERATOR "DragNDrop")
+          set(CPACK_PACKAGE_NAME "FireMinipro")
+          set(CPACK_PACKAGE_FILE_NAME "FireMinipro-${PROJECT_VERSION}-macOS")
+          include(CPack)
+          CPACK
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja -C build package
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
