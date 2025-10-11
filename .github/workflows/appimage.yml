@@ -1,0 +1,45 @@
+# .github/workflows/appimage.yml
+name: Linux AppImage
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev qt6-base-dev
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+      - name: Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ninja -C build
+      - name: Bundle AppImage
+        run: |
+          mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
+          cp build/fireminipro AppDir/usr/bin/
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=FireMinipro' \
+            'Exec=fireminipro' \
+            'Icon=fireminipro' \
+            'Categories=Development;Utility;' > AppDir/usr/share/applications/fireminipro.desktop
+          cp resources/appicon.png AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            --executable AppDir/usr/bin/fireminipro \
+            -d AppDir/usr/share/applications/fireminipro.desktop \
+            -i AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png \
+            --plugin qt --output appimage
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
