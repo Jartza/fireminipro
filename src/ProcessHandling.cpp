@@ -61,11 +61,12 @@ QStringList ProcessHandling::parseProgrammerList(const QString &text) const {
     }
 
     // Old-format: "t48: T48" or "tl866a: TL866A"
-    QRegularExpression reOld(R"(^\s*[^:\n]+:\s*([^\n;]+))", QRegularExpression::MultilineOption);
+    QRegularExpression reOld(R"(^\s*([^\s:]+)\s*:\s*[^\n;]+)", QRegularExpression::MultilineOption);
     auto it2 = reOld.globalMatch(text);
     while (it2.hasNext()) {
         auto m = it2.next();
-        const QString name = m.captured(1).trimmed();
+        QString name = m.captured(1).trimmed();
+        name = name.toUpper();
         if (!name.isEmpty() && !out.contains(name)) out << name;
     }
 
