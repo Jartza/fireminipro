@@ -58,7 +58,8 @@ ProcessHandling::ProcessHandling(QObject *parent)
     connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ 
         // if process was killed, do not log an error
         if (e == QProcess::ProcessError::Crashed) return;
-        emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); 
+        emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e)));
+        emit finished(-1, QProcess::CrashExit);
     });
 
     mode_ = Mode::Idle;
