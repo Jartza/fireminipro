@@ -126,6 +126,19 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
         }
     }
 
+    // Logic: "Vector count: 10" (logic ICs won’t have a Memory line)
+    {
+        static QRegularExpression reVec(R"(^\s*Vector count:\s*([0-9]+))",
+                                        QRegularExpression::MultilineOption);
+        auto m = reVec.match(text);
+        if (m.hasMatch()) {
+            ci.isLogic = true;
+            bool ok=false;
+            ci.vectorCount = m.captured(1).toInt(&ok);
+            if (!ok) ci.vectorCount = 0;
+        }
+    }
+
     // Protocol: "0x07"
     {
         const QString proto = cap1(rxLine("Protocol"));

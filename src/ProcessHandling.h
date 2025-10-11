@@ -21,14 +21,16 @@ public:
 
 
     struct ChipInfo {
-        QString baseName;     // e.g. "AM2764A"        (may be empty)
-        QString package;      // e.g. "DIP28"          (may be empty)
-        quint64 bytes = 0;    // 0 if unknown
-        int     wordBits = 0; // 8 for byte-wide, 16 for 16-bit; 0 if unknown
-        QString protocol;     // "0x07" or empty
-        int     readBuf = 0;  // bytes; 0 if unknown
-        int     writeBuf = 0; // bytes; 0 if unknown
-        QString raw;          // full captured text for debugging
+        QString baseName;      // e.g. "AM2764A"        (may be empty)
+        QString package;       // e.g. "DIP28"          (may be empty)
+        quint64 bytes = 0;     // 0 if unknown
+        int     wordBits = 0;  // 8 for byte-wide, 16 for 16-bit; 0 if unknown
+        QString protocol;      // "0x07" or empty
+        int     readBuf = 0;   // bytes; 0 if unknown
+        int     writeBuf = 0;  // bytes; 0 if unknown
+        QString raw;           // full captured text for debugging
+        bool    isLogic{};     // true if logic chip, false if eeprom/flash
+        int     vectorCount{}; // for logic chips, number of vectors
     };
 
 signals:

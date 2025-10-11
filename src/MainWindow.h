@@ -92,6 +92,9 @@ private:
     // Process handling helper
     ProcessHandling *proc{};
 
+    // If selected device is a logic IC
+    bool currentIsLogic_ = false;
+
     // Buffer legend manipulation
     void updateLegendTable();
     void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);

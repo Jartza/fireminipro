@@ -405,6 +405,34 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         }
     });
 
+    // Device operations wiring
+    connect(btnBlankCheck,  &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        // TODO: replace with proc->blankCheck(p, d, optionFlags());
+        if (log) log->appendPlainText("[Op] Blank check requested.");
+    });
+
+    connect(btnEraseDevice, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        // TODO: replace with proc->eraseDevice(p, d, optionFlags());
+        if (log) log->appendPlainText("[Op] Erase requested.");
+    });
+
+    connect(btnTestLogic,   &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        // TODO: replace with proc->testLogic(p, d, optionFlags());
+        if (log) log->appendPlainText("[Op] Logic test requested.");
+    });
+
     // initial state
     setUiEnabled(true);
     updateActionEnabling();
@@ -439,9 +467,28 @@ void MainWindow::updateActionEnabling() {
     const bool deviceSelected = (comboDevice->currentIndex() >= 0);
     const bool hasBuffer      = !buffer_.isEmpty();
 
-    if (btnRead)  btnRead->setEnabled(deviceSelected);               // Read needs device
-    if (btnWrite) btnWrite->setEnabled(deviceSelected && hasBuffer); // Write needs device + buffer
-    if (btnSave)  btnSave->setEnabled(hasBuffer);                    // Save needs buffer
+    // Separate logic ICs from memory devices
+    if (currentIsLogic_) {
+        // Logic IC: only “Test logic” makes sense
+        if (btnClear)       btnClear->setEnabled(false);
+        if (btnLoad)        btnLoad->setEnabled(false);
+        if (btnSave)        btnSave->setEnabled(false);
+        if (btnEraseDevice) btnEraseDevice->setEnabled(false);
+        if (btnBlankCheck)  btnBlankCheck->setEnabled(false);
+        if (btnRead)        btnRead->setEnabled(false);
+        if (btnWrite)       btnWrite->setEnabled(false);
+        if (btnTestLogic)   btnTestLogic->setEnabled(deviceSelected);
+    } else {
+        // Memory device: buffer ops + blank/erase; no logic test
+        if (btnClear)       btnClear->setEnabled(true);
+        if (btnLoad)        btnLoad->setEnabled(true);
+        if (btnSave)        btnSave->setEnabled(hasBuffer);
+        if (btnEraseDevice) btnEraseDevice->setEnabled(deviceSelected);
+        if (btnBlankCheck)  btnBlankCheck->setEnabled(deviceSelected);
+        if (btnTestLogic)   btnTestLogic->setEnabled(false);
+        if (btnRead)        btnRead->setEnabled(deviceSelected);
+        if (btnWrite)       btnWrite->setEnabled(deviceSelected && hasBuffer);
+    }
 }
 
 QStringList MainWindow::optionFlags() const {
@@ -465,14 +512,25 @@ void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
     // graceful fallbacks for partial info
     chipName     ->setText(ci.baseName.isEmpty()   ? "-" : ci.baseName);
     chipPackage  ->setText(ci.package.isEmpty()    ? "-" : ci.package);
-    chipMemory   ->setText(prettyBytes(ci.bytes));
-    chipBusWidth ->setText(ci.wordBits > 0         ? QString("%1-bit").arg(ci.wordBits) : "-");
+    if (ci.isLogic) {
+        currentIsLogic_ = true;
+        chipMemory  ->setText("-");  // logic ICs don’t have a byte size
+        chipBusWidth->setText(QString("Logic IC%1")
+                              .arg(ci.vectorCount > 0 ? QString(" (%1 vectors)").arg(ci.vectorCount) : QString()));
+    } else {
+        currentIsLogic_ = false;
+        chipMemory  ->setText(prettyBytes(ci.bytes));
+        chipBusWidth->setText(ci.wordBits > 0 ? QString("%1-bit").arg(ci.wordBits) : "-");
+    }
     chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
+
+    updateActionEnabling();
 }
 
 void MainWindow::clearChipInfo()
 {
-    ProcessHandling::ChipInfo blank; // all empty/zero
+    currentIsLogic_ = false;
+    ProcessHandling::ChipInfo blank;
     updateChipInfo(blank);
 }
 
