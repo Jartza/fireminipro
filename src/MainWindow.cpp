@@ -432,34 +432,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         }
     });
 
-    // Device operations wiring
-    connect(btnBlankCheck,  &QPushButton::clicked, this, [this]{
-        if (!proc) return;
-        const QString p = comboProgrammer->currentText().trimmed();
-        const QString d = comboDevice->currentText().trimmed();
-        if (p.isEmpty() || d.isEmpty()) return;
-        // TODO: replace with proc->blankCheck(p, d, optionFlags());
-        if (log) log->appendPlainText("[Op] Blank check requested.");
-    });
-
-    connect(btnEraseDevice, &QPushButton::clicked, this, [this]{
-        if (!proc) return;
-        const QString p = comboProgrammer->currentText().trimmed();
-        const QString d = comboDevice->currentText().trimmed();
-        if (p.isEmpty() || d.isEmpty()) return;
-        // TODO: replace with proc->eraseDevice(p, d, optionFlags());
-        if (log) log->appendPlainText("[Op] Erase requested.");
-    });
-
-    connect(btnTestLogic,   &QPushButton::clicked, this, [this]{
-        if (!proc) return;
-        const QString p = comboProgrammer->currentText().trimmed();
-        const QString d = comboDevice->currentText().trimmed();
-        if (p.isEmpty() || d.isEmpty()) return;
-        // TODO: replace with proc->testLogic(p, d, optionFlags());
-        if (log) log->appendPlainText("[Op] Logic test requested.");
-    });
-
     // When process finishes, ensure progress bar is at 100% and shows "Idle"
     connect(proc, &ProcessHandling::finished, this,
             [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
@@ -476,6 +448,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         const QString d = comboDevice->currentText().trimmed();
         if (p.isEmpty() || d.isEmpty()) return;
        proc->checkIfBlank(p, d, optionFlags());
+    });
+
+    // Erase device button
+    connect(btnEraseDevice, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        proc->eraseChip(p, d, optionFlags());
+    });
+
+    // Logic test button
+    connect(btnTestLogic, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        proc->testLogicChip(p, d, optionFlags());
     });
 
     // initial state

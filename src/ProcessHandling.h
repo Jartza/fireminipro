@@ -25,8 +25,15 @@ public:
     void checkIfBlank(const QString &programmer,
                       const QString &device,
                       const QStringList &extraFlags = {});
+    // Erase chip (minipro -e)
+    void eraseChip(const QString &programmer,
+                   const QString &device,
+                   const QStringList &extraFlags = {});
+    // Test logic chip (minipro -T)
+    void testLogicChip(const QString &programmer,
+                       const QString &device,
+                       const QStringList &extraFlags = {});
     
-
     struct ChipInfo {
         QString baseName;      // e.g. "AM2764A"        (may be empty)
         QString package;       // e.g. "DIP28"          (may be empty)
@@ -73,6 +80,7 @@ private:
         ChipInfo,
         Reading,
         Writing,
+        Logic,
     };
 
     Mode    mode_{Mode::Idle};

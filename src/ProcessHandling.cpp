@@ -282,7 +282,7 @@ void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &de
     startMinipro(Mode::ChipInfo, args);
 }
 
-// Check if chip is blank
+// Check if chip is blank: minipro -p <device> -b
 void ProcessHandling::checkIfBlank(const QString &programmer,
                                    const QString &device,
                                    const QStringList &extraFlags)
@@ -292,6 +292,30 @@ void ProcessHandling::checkIfBlank(const QString &programmer,
     args << extraFlags;
 
     startMinipro(Mode::Generic, args);
+}
+
+// Erase chip: minipro -p <device> -E
+void ProcessHandling::eraseChip(const QString &programmer,
+                                const QString &device,
+                                const QStringList &extraFlags)
+{
+    QStringList args;
+    args << "-p" << device << "-E";
+    args << extraFlags;
+
+    startMinipro(Mode::Generic, args);
+}
+
+// Test logic chip: minipro -p <device> -T
+void ProcessHandling::testLogicChip(const QString &programmer,
+                                     const QString &device,
+                                     const QStringList &extraFlags)
+{
+    QStringList args;
+    args << "-p" << device << "-T";
+    args << extraFlags;
+
+    startMinipro(Mode::Logic, args);
 }
 
 // Send input to the running process (for prompts).
@@ -327,7 +351,11 @@ void ProcessHandling::handleStdout() {
             emit errorLine(ln);
         } else if (ln.contains("is blank", Qt::CaseInsensitive)) {
             emit logLine(ln);
+        } else if (ln.contains("success", Qt::CaseInsensitive)) {
+            emit logLine(ln);
         } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
+            emit logLine(ln);
+        } else if (mode_ == Mode::Logic) {
             emit logLine(ln);
         }
 
