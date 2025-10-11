@@ -20,7 +20,7 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 - **Buffer visualization:** Load multiple binary files at arbitrary offsets, visualize overlaps, and highlight padding.
 - **Flexible file operations:** Load, clear, merge, and save buffers of any size.
 - **Device awareness:** Automatically detects connected Minipro programmers and supported device lists.
-- **Chip info:** Displays memory size, package, protocol, and voltage details directly from Minipro.
+- **Chip info:** Displays memory size, package and protocol details directly from Minipro.
 - **Device operations:** Blank check, erase, logic test, read, and write functions fully integrated.
 - **Progress tracking:** Live progress and operation status while reading or writing chips.
 - **Cross-platform support:** Works on both macOS and Linux using Qt6.
