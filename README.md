@@ -8,6 +8,13 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 
 ---
 
+## Screenshots
+
+![Main Window](img/main.png)
+![Dialog Example](img/dialog.png)
+
+---
+
 ## Features
 
 - **Buffer visualization:** Load multiple binary files at arbitrary offsets, visualize overlaps, and highlight padding.
