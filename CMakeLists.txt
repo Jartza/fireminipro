@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(fireminipro LANGUAGES CXX)
+project(fireminipro VERSION 0.0.1 LANGUAGES CXX)
 
 # --- Qt setup ---
 set(CMAKE_CXX_STANDARD 17)
@@ -28,6 +28,10 @@ qt_add_executable(${PROJECT_NAME} MACOSX_BUNDLE
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
+# Expose PROJECT_VERSION to C++ as FIREMINIPRO_VERSION
+target_compile_definitions(${PROJECT_NAME}
+    PRIVATE FIREMINIPRO_VERSION="${PROJECT_VERSION}")
+
 
 # ------------ macOS app icon (.icns) generation ------------
 # We’ll try to build appicon.icns from resources/appicon.png automatically.

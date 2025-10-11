@@ -30,6 +30,8 @@
 #include <QStyleFactory>
 #include <QFileInfo>
 #include <QApplication>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -43,8 +45,44 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    setWindowTitle("fireminipro");
+    setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool v." FIREMINIPRO_VERSION);
     this->setMinimumSize(1030,768);
+
+    // Menu bar
+    auto *mb = menuBar();
+
+    // App menu (macOS will merge this into the app menu automatically)
+    auto *menuApp = mb->addMenu(tr("&FireMinipro"));
+
+    auto *actAbout = new QAction(tr("&About FireMinipro…"), this);
+    actAbout->setMenuRole(QAction::AboutRole); // macOS-native placement
+    connect(actAbout, &QAction::triggered, this, [this]{
+        const QString ver = QStringLiteral(FIREMINIPRO_VERSION);
+        const QString qt  = QString::fromLatin1(qVersion());
+
+        QString html =
+            "<b>FireMinipro</b><br>"
+            "Version: " + ver + "<br>"
+            "Qt: " + qt + "<br><br>"
+            "A fast, buffer-first GUI for minipro.<br>"
+            "<small>© 2025 Jari Tulilahti / Firebay refurb.<br>"
+            "MIT License.</small>";
+
+        QMessageBox box(this);
+        box.setWindowTitle(tr("About FireMinipro"));
+        box.setTextFormat(Qt::RichText);
+        box.setText(html);
+        box.setIconPixmap(QPixmap(":/appicon.png").scaled(96,96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        box.exec();
+    });
+    menuApp->addAction(actAbout);
+    menuApp->addSeparator();
+
+    auto *actQuit = new QAction(tr("&Quit"), this);
+    actQuit->setShortcuts(QKeySequence::Quit);
+    actQuit->setMenuRole(QAction::QuitRole);
+    connect(actQuit, &QAction::triggered, qApp, &QCoreApplication::quit);
+    menuApp->addAction(actQuit);
 
     // Left column
     auto *leftBox = new QWidget(central);
