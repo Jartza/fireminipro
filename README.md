@@ -112,6 +112,15 @@ On Linux:
 
 ---
 
+## TODO
+
+- Implement device `verify` option
+- Remove TEMP files that are created during runtime
+- Some UI refinements
+- Parsing the Logic IC test output, for now it's just printed to log
+
+---
+
 ## License
 
 This project is released under the MIT License.  
