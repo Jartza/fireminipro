@@ -52,7 +52,12 @@ private:
     QCheckBox   *chkAsciiSwap{};
     QLabel      *lblBufSize{};
 
-    // Eeprom options
+    // Device operations
+    QPushButton *btnBlankCheck{};
+    QPushButton *btnEraseDevice{};
+    QPushButton *btnTestLogic{};
+
+    // Device options
     QCheckBox *chkSkipVerify{};
     QCheckBox *chkIgnoreId{};
     QCheckBox *chkSkipId{};

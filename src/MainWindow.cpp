@@ -209,8 +209,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
 
-    // EEPROM Options
-    auto *groupOpts  = new QGroupBox("EEPROM Options", leftBox);
+    // Device operations group (sits between Buffer and Options)
+    auto *groupDevOps = new QGroupBox("Device operations", leftBox);
+    auto *gridDO      = new QGridLayout(groupDevOps);
+
+    btnBlankCheck  = new QPushButton("Blank check",  groupDevOps);
+    btnEraseDevice = new QPushButton("Erase device", groupDevOps);
+    btnTestLogic   = new QPushButton("Test logic",   groupDevOps);
+
+    // Layout: two columns, then one full-width
+    gridDO->addWidget(btnBlankCheck,  0, 0);
+    gridDO->addWidget(btnEraseDevice, 0, 1);
+    gridDO->addWidget(btnTestLogic,   1, 0, 1, 2);
+
+    groupDevOps->setLayout(gridDO);
+    leftLayout->addWidget(groupDevOps);
+
+    // Device Options
+    auto *groupOpts  = new QGroupBox("Device Options", leftBox);
     auto *gridO      = new QGridLayout(groupOpts);
     chkSkipVerify    = new QCheckBox("Skip verify", groupOpts);
     chkIgnoreId      = new QCheckBox("Ignore ID error", groupOpts);
