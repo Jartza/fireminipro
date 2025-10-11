@@ -467,12 +467,15 @@ void MainWindow::updateActionEnabling() {
     const bool deviceSelected = (comboDevice->currentIndex() >= 0);
     const bool hasBuffer      = !buffer_.isEmpty();
 
+    // Common to all devices
+    if (btnClear)     btnClear->setEnabled(true);
+    if (btnLoad)      btnLoad->setEnabled(true);
+    if (chkAsciiSwap) chkAsciiSwap->setEnabled(hasBuffer);
+    if (btnSave)      btnSave->setEnabled(hasBuffer);
+
     // Separate logic ICs from memory devices
     if (currentIsLogic_) {
         // Logic IC: only “Test logic” makes sense
-        if (btnClear)       btnClear->setEnabled(false);
-        if (btnLoad)        btnLoad->setEnabled(false);
-        if (btnSave)        btnSave->setEnabled(false);
         if (btnEraseDevice) btnEraseDevice->setEnabled(false);
         if (btnBlankCheck)  btnBlankCheck->setEnabled(false);
         if (btnRead)        btnRead->setEnabled(false);
@@ -480,9 +483,6 @@ void MainWindow::updateActionEnabling() {
         if (btnTestLogic)   btnTestLogic->setEnabled(deviceSelected);
     } else {
         // Memory device: buffer ops + blank/erase; no logic test
-        if (btnClear)       btnClear->setEnabled(true);
-        if (btnLoad)        btnLoad->setEnabled(true);
-        if (btnSave)        btnSave->setEnabled(hasBuffer);
         if (btnEraseDevice) btnEraseDevice->setEnabled(deviceSelected);
         if (btnBlankCheck)  btnBlankCheck->setEnabled(deviceSelected);
         if (btnTestLogic)   btnTestLogic->setEnabled(false);
