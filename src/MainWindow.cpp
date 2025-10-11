@@ -391,6 +391,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         proc->readChipImage(p, d, optionFlags());
     });
 
+    // Write to target
+    connect(btnWrite, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+        if (buffer_.isEmpty()) {
+            if (log) log->appendPlainText("[Error] buffer is empty");
+            return;
+        }
+        // Export buffer to a temp file
+        QString tempPath = exportBufferToTempFileLocal("fmp-write");
+        if (tempPath.isEmpty()) {
+            if (log) log->appendPlainText("[Error] failed to create temp file for writing");
+            return;
+        }
+        // Write to target
+        proc->writeChipImage(p, d, tempPath, optionFlags());
+    });
+
     // Read from target is ready
     connect(proc, &ProcessHandling::readReady, this, [this](const QString& tempPath){
         // Use the same dialog, but with a preselected path
@@ -544,10 +564,46 @@ void MainWindow::saveBufferToFile() {
         log->appendPlainText(QString("[Error] save: %1").arg(f.errorString()));
         return;
     }
-    f.write(buffer_);
+    // Error check the write
+    if (f.write(buffer_) != buffer_.size()) {
+        log->appendPlainText("[Error] save: write failed");
+        f.close();
+        return;
+    }
+    f.close();
     log->appendPlainText(QString("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
     lastPath_ = QFileInfo(path).absolutePath();
 }
+
+// Create temp file from buffer, for writing to target
+QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
+{
+    if (buffer_.isEmpty()) {
+        if (log) log->appendPlainText("[Write] Buffer is empty.");
+        return {};
+    }
+
+    const QString safeBase = baseName.isEmpty() ? QStringLiteral("image") : baseName;
+    const QString ts = QDateTime::currentDateTime().toString("yyMMdd-HHmmss-zzz");
+    const QString dir = QDir::tempPath();
+    QString file = QString("%1-%2.bin").arg(safeBase, ts);
+    QString path = QDir(dir).filePath(file);
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly)) {
+        if (log) log->appendPlainText(QString("[Write] open temp failed: %1").arg(f.errorString()));
+        return {};
+    }
+    if (f.write(buffer_) != buffer_.size()) {
+        if (log) log->appendPlainText("[Write] write temp failed.");
+        return {};
+    }
+    f.close();
+
+    if (log) log->appendPlainText(QString("[Write] Exported buffer to %1").arg(path));
+    return path;
+}
+
 
 // parse sizes like "0x1F000", "8192", "32k", "512K", "1M", "256KB", "2MB"
 bool MainWindow::parseSizeLike(const QString &in, qulonglong &out) {

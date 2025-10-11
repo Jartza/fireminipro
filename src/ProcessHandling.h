@@ -18,7 +18,10 @@ public:
     void readChipImage(const QString& programmer,
                    const QString& device,
                    const QStringList& extraFlags = {});
-
+    void writeChipImage(const QString& programmer,
+                        const QString& device,
+                        const QString& filePath,
+                        const QStringList& extraFlags = {});
 
     struct ChipInfo {
         QString baseName;      // e.g. "AM2764A"        (may be empty)
@@ -46,6 +49,8 @@ signals:
     void chipInfoReady(const ChipInfo &ci);
     // Emitted when chip reading is successful
     void readReady(const QString& tempPath);
+    // Emitted when chip writing is done
+    void writeDone();
 
 private slots:
     void handleStdout();
@@ -54,7 +59,16 @@ private slots:
 
 private:
     // Internal mode to disambiguate generic runs vs scans
-    enum class Mode { Idle, Generic, Scan, DeviceList, ChipInfo, Reading };
+    enum class Mode { 
+        Idle,
+        Generic,
+        Scan,
+        DeviceList,
+        ChipInfo,
+        Reading,
+        Writing,
+    };
+
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
     QString stderrBuffer_;

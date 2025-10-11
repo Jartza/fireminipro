@@ -198,6 +198,34 @@ void ProcessHandling::readChipImage(const QString& programmer,
     process_.start();
 }
 
+void ProcessHandling::writeChipImage(const QString& programmer,
+                                     const QString& device,
+                                     const QString& filePath,
+                                     const QStringList& extraFlags)
+{
+    const QString bin = resolveMiniproPath();
+
+    QStringList args;
+    // For compatibility with current released minipro, avoid -q here.
+    // If you want to use a specific programmer and your minipro supports it, uncomment:
+    // if (!programmer.trimmed().isEmpty()) {
+    //     args << "-q" << programmer.trimmed();
+    // }
+    args << "-p" << device << "-w" << filePath;
+    args << extraFlags;
+
+    mode_ = Mode::Writing;
+    stdoutBuffer_.clear();
+    stderrBuffer_.clear();
+
+    emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
+
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::SeparateChannels);
+    process_.start();
+}
+
 ProcessHandling::ProcessHandling(QObject *parent)
     : QObject(parent)
 {
@@ -366,6 +394,15 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
         } else {
             mode_ = Mode::Idle;
             emit errorLine(QString("[Read error] exit=%1").arg(exitCode));
+        }
+    } else if (mode_ == Mode::Writing) {
+        const bool ok = (status == QProcess::NormalExit && exitCode == 0);
+        if (ok) {
+            mode_ = Mode::Idle;
+            emit writeDone();
+        } else {
+            mode_ = Mode::Idle;
+            emit errorLine(QString("[Write error] exit=%1").arg(exitCode));
         }
     } else {
         mode_ = Mode::Idle;

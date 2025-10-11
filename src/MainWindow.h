@@ -105,6 +105,7 @@ private:
     void updateActionEnabling();
     void updateChipInfo(const ProcessHandling::ChipInfo &ci);
     void clearChipInfo();
+    QString exportBufferToTempFileLocal(const QString& baseName);
 
     // parsing / buffer helpers
     bool parseSizeLike(const QString &in, qulonglong &out);
