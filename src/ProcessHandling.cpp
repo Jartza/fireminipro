@@ -174,6 +174,29 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
     return ci;
 }
 
+// Start the minipro process and make sure only one instance is running
+void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
+{
+    // If something is still running, stop it (keeps current behavior)
+    if (process_.state() != QProcess::NotRunning)
+        process_.kill();
+
+    const QString bin = resolveMiniproPath();
+
+    // Log the exact command line we’re about to run
+    emit logLine(QString("[Run] %1 %2").arg(bin, args.join(' ')));
+
+    // Set mode first, then clear any previous buffered output
+    mode_ = mode;
+    stdoutBuffer_.clear();
+
+    // Unified QProcess setup
+    process_.setProgram(bin);
+    process_.setArguments(args);
+    process_.setProcessChannelMode(QProcess::MergedChannels);
+    process_.start();
+}
+
 static QString uniqueTempPath(const QString& base = "fireminipro-read")
 {
     const QString tmpRoot =
@@ -186,8 +209,6 @@ void ProcessHandling::readChipImage(const QString& programmer,
                                     const QString& device,
                                     const QStringList& extraFlags)
 {
-    const QString bin = resolveMiniproPath();
-
     // Parse device name without @ending, if one exists
     QString deviceName = device.split('@').first().trimmed();
     QString outPath = uniqueTempPath(deviceName);
@@ -201,15 +222,7 @@ void ProcessHandling::readChipImage(const QString& programmer,
     args << "-p" << device << "-r" << outPath;
     args << extraFlags;
 
-    mode_ = Mode::Reading;
-    stdoutBuffer_.clear();
-
-    emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
+    startMinipro(Mode::Reading, args);
 }
 
 void ProcessHandling::writeChipImage(const QString& programmer,
@@ -228,15 +241,7 @@ void ProcessHandling::writeChipImage(const QString& programmer,
     args << "-p" << device << "-w" << filePath;
     args << extraFlags;
 
-    mode_ = Mode::Writing;
-    stdoutBuffer_.clear();
-
-    emit logLine(QString("[Run] %1 %2").arg(bin).arg(args.join(' ')));
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
+    startMinipro(Mode::Writing, args);
 }
 
 ProcessHandling::ProcessHandling(QObject *parent)
@@ -252,81 +257,32 @@ ProcessHandling::ProcessHandling(QObject *parent)
     stdoutBuffer_.clear();
 }
 
-void ProcessHandling::startCommand(const QStringList &args) {
-    if (process_.state() != QProcess::NotRunning)
-        process_.kill();
-
-    const QString bin = resolveMiniproPath();
-    emit logLine("[Run] " + bin + " " + args.join(' '));
-
-    mode_ = Mode::Generic;
-    stdoutBuffer_.clear();
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
-}
-
 void ProcessHandling::scanConnectedDevices() {
     if (process_.state() != QProcess::NotRunning)
         process_.kill();
 
-    const QString bin = resolveMiniproPath();
     const QStringList args{ "-k" };
-    emit logLine("[Run] " + bin + " " + args.join(' '));
 
-    mode_ = Mode::Scan;
-    stdoutBuffer_.clear();
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
+    startMinipro(Mode::Scan, args);
 }
 
 void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 {
-    if (process_.state() != QProcess::NotRunning)
-        process_.kill();
-
-    const QString bin = resolveMiniproPath();
     // Order: -q <programmer> -l
     const QStringList args{ "-q", programmer, "-l" };
 
-    emit logLine("[Run] " + bin + " " + args.join(' '));
-
-    mode_ = Mode::DeviceList;
-    stdoutBuffer_.clear();
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
+    startMinipro(Mode::DeviceList, args);
 }
 
 void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &device)
 {
-    if (process_.state() != QProcess::NotRunning)
-        process_.kill();
-
-    const QString bin = resolveMiniproPath();
-
     // Build args. QProcess handles spaces in args, no manual quoting needed.
     QStringList args;
     if (!programmer.isEmpty())
         args << "-q" << programmer;
     args << "-d" << device;
 
-    emit logLine("[Run] " + bin + " " + args.join(' '));
-
-    mode_ = Mode::ChipInfo;
-    stdoutBuffer_.clear();
-
-    process_.setProgram(bin);
-    process_.setArguments(args);
-    process_.setProcessChannelMode(QProcess::MergedChannels);
-    process_.start();
+    startMinipro(Mode::ChipInfo, args);
 }
 
 void ProcessHandling::sendResponse(const QString &input) {
@@ -352,6 +308,10 @@ void ProcessHandling::handleStdout() {
         } else if (ln.contains("warning", Qt::CaseInsensitive)) {
             emit errorLine(ln);
         } else if (ln.contains("invalid", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
+        } else if (ln.contains("incorrect", Qt::CaseInsensitive)) {
+            emit errorLine(ln);
+        } else if (ln.contains("verification", Qt::CaseInsensitive)) {
             emit errorLine(ln);
         } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
             emit logLine(ln);

@@ -7,7 +7,6 @@ class ProcessHandling : public QObject {
     Q_OBJECT
 public:
     explicit ProcessHandling(QObject *parent = nullptr);
-    void startCommand(const QStringList &args);
     void sendResponse(const QString &input);
     // Fire-and-forget scan for connected programmers (minipro -k)
     void scanConnectedDevices();
@@ -76,6 +75,7 @@ private:
     QString pendingTempPath_;
 
     QString resolveMiniproPath();
+    void startMinipro(Mode mode, const QStringList& args);
     QStringList parseProgrammerList(const QString &text) const;
     ChipInfo parseChipInfo(const QString &text) const;
     QProcess process_;
