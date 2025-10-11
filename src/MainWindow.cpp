@@ -495,7 +495,7 @@ QStringList MainWindow::optionFlags() const {
     QStringList f;
     if (chkSkipVerify->isChecked())    f << "-v";
     if (chkIgnoreId->isChecked())      f << "-y";
-    if (chkSkipId->isChecked())        f << "-xq";
+    if (chkSkipId->isChecked())        f << "-x";
     if (chkNoSizeErr->isChecked())     f << "-s";
     return f;
 }
