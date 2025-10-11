@@ -19,10 +19,19 @@ jobs:
           qt_prefix=$(brew --prefix qt@6)
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$qt_prefix"
           ninja -C build
-      - name: Deploy Qt into .app and package DMG
+      - name: Deploy Qt into .app bundle
         run: |
           qt_prefix=$(brew --prefix qt@6)
-          "$qt_prefix/bin/macdeployqt" build/fireminipro.app -verbose=2 -dmg
+          "$qt_prefix/bin/macdeployqt" build/fireminipro.app -verbose=2
+      - name: Ad-hoc sign app bundle
+        run: |
+          xattr -cr build/fireminipro.app
+          codesign --force --deep --sign - build/fireminipro.app
+      - name: Create DMG
+        run: |
+          mkdir -p dist
+          cp -R build/fireminipro.app dist/
+          hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro.dmg
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
