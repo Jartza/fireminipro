@@ -529,6 +529,11 @@ void MainWindow::disableBusyButtons()
 }
 
 void MainWindow::updateActionEnabling() {
+    // Always enable programmer/device selection and rescan
+    if (comboProgrammer) comboProgrammer->setEnabled(true);
+    if (comboDevice)     comboDevice->setEnabled(true);
+    if (btnRescan)      btnRescan->setEnabled(true);
+
     const bool deviceSelected = (comboDevice->currentIndex() >= 0);
     const bool hasBuffer      = !buffer_.isEmpty();
 
