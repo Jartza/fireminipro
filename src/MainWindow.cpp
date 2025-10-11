@@ -434,8 +434,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         [this](int pct, const QString &label) {
         if (progReadWrite) {
             if (!progReadWrite->isVisible()) progReadWrite->show();
-            progReadWrite->setValue(pct);
-            progReadWrite->setFormat(label.isEmpty() ? QStringLiteral("%p%") : label + " %p%");
+            if (pct > 0) progReadWrite->setValue(pct);
+            if (!label.isEmpty()) progReadWrite->setFormat(label + " %p%");
         }
     });
 
