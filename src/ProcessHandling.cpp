@@ -214,11 +214,8 @@ void ProcessHandling::readChipImage(const QString& programmer,
     QString outPath = uniqueTempPath(deviceName);
     pendingTempPath_ = outPath;
 
+    // We might need extraFlags like "-y" for reading
     QStringList args;
-    // if (!programmer.trimmed().isEmpty()) {
-    //     args << "-q" << programmer.trimmed();
-    // }
-
     args << "-p" << device << "-r" << outPath;
     args << extraFlags;
 
@@ -230,14 +227,8 @@ void ProcessHandling::writeChipImage(const QString& programmer,
                                      const QString& filePath,
                                      const QStringList& extraFlags)
 {
-    const QString bin = resolveMiniproPath();
-
     QStringList args;
-    // For compatibility with current released minipro, avoid -q here.
-    // If you want to use a specific programmer and your minipro supports it, uncomment:
-    // if (!programmer.trimmed().isEmpty()) {
-    //     args << "-q" << programmer.trimmed();
-    // }
+    // We might need extraFlags like "-y" for writing
     args << "-p" << device << "-w" << filePath;
     args << extraFlags;
 
@@ -258,9 +249,6 @@ ProcessHandling::ProcessHandling(QObject *parent)
 }
 
 void ProcessHandling::scanConnectedDevices() {
-    if (process_.state() != QProcess::NotRunning)
-        process_.kill();
-
     const QStringList args{ "-k" };
 
     startMinipro(Mode::Scan, args);
@@ -268,7 +256,7 @@ void ProcessHandling::scanConnectedDevices() {
 
 void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 {
-    // Order: -q <programmer> -l
+    // Supported devices need programmer name: -q <programmer> -l
     const QStringList args{ "-q", programmer, "-l" };
 
     startMinipro(Mode::DeviceList, args);
@@ -276,7 +264,7 @@ void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 
 void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &device)
 {
-    // Build args. QProcess handles spaces in args, no manual quoting needed.
+    // Chip info needs programmer and device: -q <programmer> -d <dev>
     QStringList args;
     if (!programmer.isEmpty())
         args << "-q" << programmer;
