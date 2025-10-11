@@ -69,8 +69,11 @@ cd fireminipro
 FireMinipro uses **CMake** and **Ninja** for fast, cross-platform builds.
 
 ```bash
-cmake -B build -G Ninja
-cmake --build build
+mkdir build
+cd build
+cmake -G Ninja ..
+ninja
+cd ..
 ```
 
 ### 3. Run the application
