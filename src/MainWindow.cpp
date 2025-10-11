@@ -128,7 +128,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
       &QLineEdit::textEdited,
       this,
       [this, filter_model](const QString &text) {
-        filter_model->setFilterFixedString(text);
+        if (text.size() > 1 && filter_model) {
+            filter_model->setFilterFixedString(text);
+        }
       }
     );
 
