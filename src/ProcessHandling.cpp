@@ -55,7 +55,11 @@ ProcessHandling::ProcessHandling(QObject *parent)
             this, &ProcessHandling::handleStdout);
     connect(&process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
             this, &ProcessHandling::handleFinished);
-    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); });
+    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ 
+        // if process was killed, do not log an error
+        if (e == QProcess::ProcessError::Crashed) return;
+        emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); 
+    });
 
     mode_ = Mode::Idle;
     stdoutBuffer_.clear();
@@ -194,8 +198,10 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
 void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
 {
     // If something is still running, stop it (keeps current behavior)
-    if (process_.state() != QProcess::NotRunning)
+    if (process_.state() != QProcess::NotRunning) {
         process_.kill();
+        process_.waitForFinished(3000);
+    }
 
     const QString bin = resolveMiniproPath();
 
