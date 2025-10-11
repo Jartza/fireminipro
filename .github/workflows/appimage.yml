@@ -12,17 +12,22 @@ jobs:
       - name: Install deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev qt6-base-dev
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
-          chmod +x linuxdeploy*.AppImage
-      - name: Point plugin to Qt6 qmake
-        run: echo "QMAKE=/usr/lib/qt6/bin/qmake" >> $GITHUB_ENV
+          sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev qt6-base-dev qt6-base-dev-tools
+      - name: Make Qt6 qmake discoverable
+        run: |
+          if [ -x /usr/lib/qt6/bin/qmake6 ]; then
+            sudo ln -sf /usr/lib/qt6/bin/qmake6 /usr/local/bin/qmake
+          elif [ -x /usr/lib/qt6/bin/qmake ]; then
+            sudo ln -sf /usr/lib/qt6/bin/qmake /usr/local/bin/qmake
+          fi
+          qmake -v || true
       - name: Build
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/qt6
           ninja -C build
       - name: Bundle AppImage
+        env:
+          QMAKE: /usr/local/bin/qmake
         run: |
           mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
           cp build/fireminipro AppDir/usr/bin/
