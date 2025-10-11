@@ -55,8 +55,8 @@ signals:
     void errorLine(const QString &text);
     // Parsed progress %
     void progress(int percent, const QString& phase);
+    // Emitted when a prompt is detected from the process
     void promptDetected(const QString &promptText);
-    void finished(int exitCode, QProcess::ExitStatus status);
     // Emitted after scanConnectedDevices() completes
     void devicesScanned(const QStringList &names);
     void devicesListed(const QStringList &names);
@@ -66,6 +66,10 @@ signals:
     void readReady(const QString& tempPath);
     // Emitted when chip writing is done
     void writeDone();
+    // Emitted when process starts
+    void started();
+    // Emitted when process finishes    
+    void finished(int exitCode, QProcess::ExitStatus status);
 
 private slots:
     void handleStdout();

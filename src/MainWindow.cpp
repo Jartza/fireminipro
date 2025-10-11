@@ -29,6 +29,7 @@
 #include <QProgressBar>
 #include <QStyleFactory>
 #include <QFileInfo>
+#include <QApplication>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -438,14 +439,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         }
     });
 
-    // When process finishes, ensure progress bar is at 100% and shows "Idle"
+    // Disable UI buttons when minipro is running
+    connect(proc, &ProcessHandling::started, this, [this]{
+        disableBusyButtons();
+        QApplication::setOverrideCursor(Qt::BusyCursor);
+    });
+
+    // When process finishes, ensure progress bar is at 100% and shows "Idle",
+    // and that the UI is re-enabled after process completion
     connect(proc, &ProcessHandling::finished, this,
-            [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
-                if (!progReadWrite) return;
+        [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
+            // Always restore UI first
+            updateActionEnabling();
+            QApplication::restoreOverrideCursor();
+            if (progReadWrite) {
                 progReadWrite->setValue(100);
                 progReadWrite->setFormat(QStringLiteral("Idle"));
                 progReadWrite->setTextVisible(true);
-            });
+            }
+        });
 
     // Blank check button
     connect(btnBlankCheck, &QPushButton::clicked, this, [this]{
@@ -503,6 +515,17 @@ void MainWindow::setUiEnabled(bool on) {
     // Disabled at boot
     for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice})
         if (w) w->setEnabled(false);
+}
+
+// Disable buttons that should not be used while a process is running
+void MainWindow::disableBusyButtons()
+{
+    for (QWidget *w : std::vector<QWidget*>{
+        btnRead, btnWrite, btnEraseDevice, btnBlankCheck, btnTestLogic,
+        btnRescan, comboProgrammer, comboDevice, btnLoad, btnSave, btnClear
+    }) {
+        if (w) w->setEnabled(false);
+    }
 }
 
 void MainWindow::updateActionEnabling() {
@@ -848,6 +871,9 @@ private:
 
 // Load file to buffer at user-specified offset, with optional padding
 void MainWindow::loadAtOffsetDialog(QString path) {
+    // Sanitary cursor
+    QApplication::restoreOverrideCursor();
+
     // If preset path is given, skip the file picker dialog
     if (path.isEmpty()) {
         path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,

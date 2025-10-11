@@ -102,6 +102,7 @@ private:
     // Helpers
     QStringList optionFlags() const;
     void setUiEnabled(bool on);
+    void disableBusyButtons();
     void updateActionEnabling();
     void updateChipInfo(const ProcessHandling::ChipInfo &ci);
     void clearChipInfo();

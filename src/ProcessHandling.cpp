@@ -217,6 +217,7 @@ void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
     process_.setArguments(args);
     process_.setProcessChannelMode(QProcess::MergedChannels);
     process_.start();
+    emit started();
 }
 
 // Helper to create a unique temp path for reading
