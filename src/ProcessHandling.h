@@ -21,6 +21,11 @@ public:
                         const QString& device,
                         const QString& filePath,
                         const QStringList& extraFlags = {});
+    // Check if chip is blank (minipro -b)
+    void checkIfBlank(const QString &programmer,
+                      const QString &device,
+                      const QStringList &extraFlags = {});
+    
 
     struct ChipInfo {
         QString baseName;      // e.g. "AM2764A"        (may be empty)

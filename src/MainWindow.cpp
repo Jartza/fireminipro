@@ -331,8 +331,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     proc = new ProcessHandling(this);
     connect(proc, &ProcessHandling::logLine,
             log, &QPlainTextEdit::appendPlainText);
-    connect(proc, &ProcessHandling::errorLine,
-            log, &QPlainTextEdit::appendPlainText);
+    // Display error lines in red
+    connect(proc, &ProcessHandling::errorLine, this, [this](const QString &line){
+        if (!log) return;
+        log->appendHtml("<font color='red'>" + line + "</font>");
+    });
     connect(proc, &ProcessHandling::devicesScanned, this, [this](const QStringList &names){
         if (!log) return;
         if (!names.isEmpty()) {
@@ -465,6 +468,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
                 progReadWrite->setFormat(QStringLiteral("Idle"));
                 progReadWrite->setTextVisible(true);
             });
+
+    // Blank check button
+    connect(btnBlankCheck, &QPushButton::clicked, this, [this]{
+        if (!proc) return;
+        const QString p = comboProgrammer->currentText().trimmed();
+        const QString d = comboDevice->currentText().trimmed();
+        if (p.isEmpty() || d.isEmpty()) return;
+       proc->checkIfBlank(p, d, optionFlags());
+    });
 
     // initial state
     setUiEnabled(true);

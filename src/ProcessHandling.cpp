@@ -47,6 +47,20 @@ static QString detectPhaseText(const QString& line)
 }
 } // namespace
 
+// Constructor
+ProcessHandling::ProcessHandling(QObject *parent)
+    : QObject(parent)
+{
+    connect(&process_, &QProcess::readyReadStandardOutput,
+            this, &ProcessHandling::handleStdout);
+    connect(&process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &ProcessHandling::handleFinished);
+    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); });
+
+    mode_ = Mode::Idle;
+    stdoutBuffer_.clear();
+}
+
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable("minipro");
     if (bin.isEmpty()) {
@@ -63,6 +77,7 @@ QString ProcessHandling::resolveMiniproPath() {
     return bin;
 }
 
+// Parse programmer list output from minipro -k
 QStringList ProcessHandling::parseProgrammerList(const QString &text) const {
     QStringList out;
 
@@ -95,6 +110,7 @@ QStringList ProcessHandling::parseProgrammerList(const QString &text) const {
     return out;
 }
 
+// Parse chip info output from minipro -q <programmer> -d "<dev>"
 ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) const
 {
     ChipInfo ci;
@@ -197,6 +213,7 @@ void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
     process_.start();
 }
 
+// Helper to create a unique temp path for reading
 static QString uniqueTempPath(const QString& base = "fireminipro-read")
 {
     const QString tmpRoot =
@@ -205,6 +222,7 @@ static QString uniqueTempPath(const QString& base = "fireminipro-read")
     return QDir(tmpRoot).filePath(base + "-" + ts + ".bin");
 }
 
+// Read from chip to a unique temp file, emit readReady() with path when done
 void ProcessHandling::readChipImage(const QString& programmer,
                                     const QString& device,
                                     const QStringList& extraFlags)
@@ -222,6 +240,7 @@ void ProcessHandling::readChipImage(const QString& programmer,
     startMinipro(Mode::Reading, args);
 }
 
+// Write from a given file to chip
 void ProcessHandling::writeChipImage(const QString& programmer,
                                      const QString& device,
                                      const QString& filePath,
@@ -235,25 +254,14 @@ void ProcessHandling::writeChipImage(const QString& programmer,
     startMinipro(Mode::Writing, args);
 }
 
-ProcessHandling::ProcessHandling(QObject *parent)
-    : QObject(parent)
-{
-    connect(&process_, &QProcess::readyReadStandardOutput,
-            this, &ProcessHandling::handleStdout);
-    connect(&process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
-            this, &ProcessHandling::handleFinished);
-    connect(&process_, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e){ emit errorLine(QString("[QProcess error] %1").arg(static_cast<int>(e))); });
-
-    mode_ = Mode::Idle;
-    stdoutBuffer_.clear();
-}
-
+// Scan for connected programmers (minipro -k)
 void ProcessHandling::scanConnectedDevices() {
     const QStringList args{ "-k" };
 
     startMinipro(Mode::Scan, args);
 }
 
+// Fetch supported devices for a given programmer (minipro -q <programmer> -l)
 void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 {
     // Supported devices need programmer name: -q <programmer> -l
@@ -262,6 +270,7 @@ void ProcessHandling::fetchSupportedDevices(const QString &programmer)
     startMinipro(Mode::DeviceList, args);
 }
 
+// Fetch chip info for a given programmer and device (minipro -q <programmer> -d "<dev>")
 void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &device)
 {
     // Chip info needs programmer and device: -q <programmer> -d <dev>
@@ -273,6 +282,20 @@ void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &de
     startMinipro(Mode::ChipInfo, args);
 }
 
+// Check if chip is blank
+void ProcessHandling::checkIfBlank(const QString &programmer,
+                                   const QString &device,
+                                   const QStringList &extraFlags)
+{
+    QStringList args;
+    args << "-p" << device << "-b";
+    args << extraFlags;
+
+    startMinipro(Mode::Generic, args);
+}
+
+// Send input to the running process (for prompts).
+// not used yet.
 void ProcessHandling::sendResponse(const QString &input) {
     if (process_.state() == QProcess::Running) {
         QTextStream(&process_).operator<<(input + "\n");
@@ -294,13 +317,16 @@ void ProcessHandling::handleStdout() {
         if (ln.contains("error", Qt::CaseInsensitive)) {
             emit errorLine(ln);
         } else if (ln.contains("warning", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
+            if (!ln.contains("not yet complete", Qt::CaseInsensitive)) // ignore "not yet completed" warnings
+                emit logLine(ln);
         } else if (ln.contains("invalid", Qt::CaseInsensitive)) {
             emit errorLine(ln);
         } else if (ln.contains("incorrect", Qt::CaseInsensitive)) {
             emit errorLine(ln);
-        } else if (ln.contains("verification", Qt::CaseInsensitive)) {
+        } else if (ln.contains("failed", Qt::CaseInsensitive)) {
             emit errorLine(ln);
+        } else if (ln.contains("is blank", Qt::CaseInsensitive)) {
+            emit logLine(ln);
         } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
             emit logLine(ln);
         }
