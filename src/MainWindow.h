@@ -53,14 +53,10 @@ private:
     QLabel      *lblBufSize{};
 
     // Eeprom options
-    QCheckBox *chkBlankCheck{};
-    QCheckBox *chkErase{};
     QCheckBox *chkSkipVerify{};
     QCheckBox *chkIgnoreId{};
     QCheckBox *chkSkipId{};
     QCheckBox *chkNoSizeErr{};
-    QCheckBox *chkPinCheck{};
-    QCheckBox *chkHardwareCheck{};
 
     // Views
     QTableView     *tableHex{};

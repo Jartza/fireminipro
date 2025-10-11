@@ -35,16 +35,20 @@
 #include "HexView.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
+    // The constructor builds the entire UI programmatically.
+    // This avoids the need for .ui files and Qt Designer.
+
+    // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
     setWindowTitle("fireminipro");
     this->setMinimumSize(1030,768);
 
-    // left column
+    // Left column
     auto *leftBox = new QWidget(central);
     auto *leftLayout = new QVBoxLayout(leftBox);
 
-    // Target
+    // Target group
     auto *groupTargets = new QGroupBox("Target", leftBox);
     auto *gridT = new QGridLayout(groupTargets);
     comboProgrammer = new QComboBox(groupTargets);
@@ -69,20 +73,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addWidget(groupTargets);
 
     // Make device combobox searchable / filterable
+    // and editable to allow custom device names,
+    // also enable clear button
     comboDevice->setEditable(true);
     comboDevice->setInsertPolicy(QComboBox::NoInsert);
     comboDevice->setFocusPolicy(Qt::StrongFocus);
     comboDevice->lineEdit()->setClearButtonEnabled(true);
 
+    // Use a filter proxy model to filter the device list
     auto *filter_model = new QSortFilterProxyModel(comboDevice);
     filter_model->setFilterCaseSensitivity(Qt::CaseInsensitive);
     filter_model->setSourceModel(comboDevice->model());
 
+    // Set the filtered model as the view for the combobox
+    // this allows typing to filter the dropdown list
     auto *completer = new QCompleter(filter_model, comboDevice);
     completer->setCompletionMode(QCompleter::UnfilteredPopupCompletion);
     comboDevice->setCompleter(completer);
 
     // When selection changes, update action enabling
+    // Also, fetch chip info when user selects a device
     connect(comboDevice, qOverload<int>(&QComboBox::currentIndexChanged),
         this, [this](int idx){
             updateActionEnabling();
@@ -92,7 +102,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             }
         });
 
-    // fetch only on user action
+    // fetch only on user action. Avoid fetching on every text change
+    // to avoid spamming when user is in the middle of typing to filter
     connect(comboDevice, qOverload<int>(&QComboBox::activated),
         this, [this](int idx){
             if (idx >= 0 && proc) {
@@ -105,6 +116,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             }
         });
 
+    // When user types in the combobox, filter the list
     connect(comboDevice->lineEdit(),
       &QLineEdit::textEdited,
       this,
@@ -113,6 +125,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
       }
     );
 
+    // When user clicks the combobox, clear the text on first click
     connect(comboDevice,
       &QComboBox::textActivated,
       comboDevice->lineEdit(),
@@ -131,7 +144,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             }
         });
 
-
+    // Event filter to clear text on first click
     comboDevice->lineEdit()->installEventFilter(this);
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
@@ -199,24 +212,16 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // EEPROM Options
     auto *groupOpts  = new QGroupBox("EEPROM Options", leftBox);
     auto *gridO      = new QGridLayout(groupOpts);
-    chkBlankCheck    = new QCheckBox("Blank check", groupOpts);
-    chkErase         = new QCheckBox("Erase", groupOpts);
     chkSkipVerify    = new QCheckBox("Skip verify", groupOpts);
     chkIgnoreId      = new QCheckBox("Ignore ID error", groupOpts);
     chkSkipId        = new QCheckBox("Skip ID check", groupOpts);
     chkNoSizeErr     = new QCheckBox("Ignore size error", groupOpts);
-    chkPinCheck      = new QCheckBox("Pin check", groupOpts);
-    chkHardwareCheck = new QCheckBox("Hardware check", groupOpts);
 
     // layout options (2 columns)
-    gridO->addWidget(chkBlankCheck,    0,0);
-    gridO->addWidget(chkErase,         0,1);
-    gridO->addWidget(chkSkipVerify,    1,0);
-    gridO->addWidget(chkIgnoreId,      1,1);
-    gridO->addWidget(chkSkipId,        2,0);
-    gridO->addWidget(chkNoSizeErr,     2,1);
-    gridO->addWidget(chkPinCheck,      3,0);
-    gridO->addWidget(chkHardwareCheck, 3,1);
+    gridO->addWidget(chkSkipVerify,    0,0);
+    gridO->addWidget(chkIgnoreId,      0,1);
+    gridO->addWidget(chkSkipId,        1,0);
+    gridO->addWidget(chkNoSizeErr,     1,1);
 
     groupOpts->setLayout(gridO);
     leftLayout->addWidget(groupOpts);
@@ -425,14 +430,10 @@ void MainWindow::updateActionEnabling() {
 
 QStringList MainWindow::optionFlags() const {
     QStringList f;
-    if (chkBlankCheck->isChecked())    f << "--blank_check";
-    if (chkErase->isChecked())         f << "--erase";
-    if (chkSkipVerify->isChecked())    f << "--skip_verify";
+    if (chkSkipVerify->isChecked())    f << "-v";
     if (chkIgnoreId->isChecked())      f << "-y";
-    if (chkSkipId->isChecked())        f << "--skip_id";
-    if (chkNoSizeErr->isChecked())     f << "--no_size_error";
-    if (chkPinCheck->isChecked())      f << "--pin_check";
-    if (chkHardwareCheck->isChecked()) f << "--hardware_check";
+    if (chkSkipId->isChecked())        f << "-xq";
+    if (chkNoSizeErr->isChecked())     f << "-s";
     return f;
 }
 
