@@ -1,5 +1,37 @@
 cmake_minimum_required(VERSION 3.16)
-project(fireminipro VERSION 0.0.4 LANGUAGES CXX)
+
+# ---- Derive version string ----
+set(_fireminipro_version "0.0.0")
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+  find_package(Git QUIET)
+  if(GIT_FOUND)
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --always
+      WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      OUTPUT_VARIABLE _git_describe
+      RESULT_VARIABLE _git_result
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(_git_result EQUAL 0 AND NOT _git_describe STREQUAL "")
+      set(_fireminipro_version "${_git_describe}")
+    endif()
+  endif()
+endif()
+
+if(_fireminipro_version STREQUAL "0.0.0")
+  set(_version_file "${CMAKE_SOURCE_DIR}/cmake/version.txt")
+  if(EXISTS "${_version_file}")
+    file(READ "${_version_file}" _archived_version)
+    string(STRIP "${_archived_version}" _archived_version)
+    if(NOT _archived_version MATCHES "\\$Format")
+      set(_fireminipro_version "${_archived_version}")
+    endif()
+  endif()
+endif()
+
+project(fireminipro VERSION 0.0.0 LANGUAGES CXX)
+set(PROJECT_VERSION "${_fireminipro_version}")
+set(FIREMINIPRO_VERSION_STRING "${PROJECT_VERSION}")
 
 # --- Qt setup ---
 set(CMAKE_CXX_STANDARD 17)
@@ -30,7 +62,7 @@ qt_add_executable(${PROJECT_NAME} MACOSX_BUNDLE
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
 # Expose PROJECT_VERSION to C++ as FIREMINIPRO_VERSION
 target_compile_definitions(${PROJECT_NAME}
-    PRIVATE FIREMINIPRO_VERSION="${PROJECT_VERSION}")
+    PRIVATE FIREMINIPRO_VERSION="${FIREMINIPRO_VERSION_STRING}")
 
 
 # ------------ macOS app icon (.icns) generation ------------
