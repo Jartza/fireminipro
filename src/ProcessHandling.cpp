@@ -69,6 +69,25 @@ ProcessHandling::ProcessHandling(QObject *parent)
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable(QStringLiteral("minipro"));
 
+    // Resolve bundled share directory so we can point MINIPRO_HOME to it.
+    auto bundledShareDir = []() -> QString {
+        const QString appDirEnv = qEnvironmentVariable("APPDIR");
+        if (!appDirEnv.isEmpty()) {
+            return appDirEnv + "/usr/share/minipro";
+        }
+        const QString execDir = QCoreApplication::applicationDirPath();
+        if (!execDir.isEmpty()) {
+            QDir dir(execDir);
+            if (dir.cd("../share/minipro")) {
+                return dir.canonicalPath();
+            }
+        }
+        return {};
+    }();
+    if (!bundledShareDir.isEmpty()) {
+        qputenv("MINIPRO_HOME", bundledShareDir.toUtf8());
+    }
+
     QStringList candidates;
 
     // In AppImage/runtime environments APPDIR points to the mounted bundle.
