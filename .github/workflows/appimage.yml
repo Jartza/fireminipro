@@ -39,8 +39,8 @@ jobs:
           cd "minipro-${MINIPRO_VERSION}"
           sed -i 's/^UDEV_DIR=/UDEV_DIR?=/' Makefile
           sed -i 's/^COMPLETIONS_DIR=/COMPLETIONS_DIR?=/' Makefile
-          make PREFIX=/usr UDEV_DIR= COMPLETIONS_DIR=
-          make PREFIX=/usr DESTDIR="$MINIPRO_STAGING" UDEV_DIR= COMPLETIONS_DIR= install
+          make PREFIX=/usr SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR=
+          make PREFIX=/usr DESTDIR="$MINIPRO_STAGING" SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR= install
       - name: Fetch linuxdeploy tooling
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
