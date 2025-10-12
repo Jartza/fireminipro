@@ -32,6 +32,7 @@
 #include <QApplication>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QWindow>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -978,6 +979,17 @@ void MainWindow::loadAtOffsetDialog(QString path) {
 
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
+    dlg.setWindowModality(Qt::WindowModal);
+    dlg.setWindowFlag(Qt::Dialog);
+    dlg.setWindowFlag(Qt::WindowTitleHint);
+    dlg.setWindowFlag(Qt::CustomizeWindowHint, false);
+    dlg.setWindowFlag(Qt::WindowSystemMenuHint, false);
+    dlg.winId();
+    if (auto *dlgWin = dlg.windowHandle()) {
+        if (auto *parentWin = windowHandle()) {
+            dlgWin->setTransientParent(parentWin);
+        }
+    }
     dlg.setWindowTitle(tr("Load file to buffer"));
     dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
