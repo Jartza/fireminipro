@@ -102,6 +102,7 @@ jobs:
             -i AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png \
             "${extra_flags[@]}" \
             --plugin qt --output appimage
+          rm -f linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
