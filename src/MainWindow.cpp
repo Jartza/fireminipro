@@ -32,7 +32,6 @@
 #include <QApplication>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QWindow>
 #include <algorithm>
 
 #include "ProcessHandling.h"

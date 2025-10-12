@@ -112,3 +112,9 @@ endif()
 #   MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
 #   MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
 # )
+if(APPLE)
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_BUNDLE_DIR:${PROJECT_NAME}>
+    COMMENT "Touching app bundle to refresh Finder icon"
+  )
+endif()
