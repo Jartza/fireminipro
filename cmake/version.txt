@@ -1,1 +1,1 @@
-$Format:%(describe:tags=true,dirty=+dirty)$
+$Format:%(describe:tags=true)$

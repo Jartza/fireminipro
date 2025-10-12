@@ -6,7 +6,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   find_package(Git QUIET)
   if(GIT_FOUND)
     execute_process(
-      COMMAND "${GIT_EXECUTABLE}" describe --tags --dirty --always
+      COMMAND "${GIT_EXECUTABLE}" describe --tags --always
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       OUTPUT_VARIABLE _git_describe
       RESULT_VARIABLE _git_result
@@ -29,10 +29,14 @@ if(_fireminipro_version STREQUAL "0.0.0")
   endif()
 endif()
 
-string(REGEX REPLACE "^v" "" _numeric_version "${_fireminipro_version}")
-project(fireminipro VERSION 0.0.0 LANGUAGES CXX)
-set(PROJECT_VERSION "${_fireminipro_version}")
-set(FIREMINIPRO_VERSION_STRING "${_numeric_version}")
+string(REGEX REPLACE "^v" "" FIREMINIPRO_VERSION_STRING "${_fireminipro_version}")
+string(REGEX REPLACE "^v" "" _version_clean "${_fireminipro_version}")
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)*" _numeric_version "${_version_clean}")
+if(_numeric_version STREQUAL "")
+  set(_numeric_version "0.0.0")
+endif()
+
+project(fireminipro VERSION ${_numeric_version} LANGUAGES CXX)
 
 # --- Qt setup ---
 set(CMAKE_CXX_STANDARD 17)
