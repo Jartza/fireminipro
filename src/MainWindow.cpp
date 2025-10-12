@@ -1101,6 +1101,8 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     QObject::connect(editPad, &QLineEdit::textChanged, &dlg, updateInfo);
 
     updateInfo();
+    dlg.raise();
+    dlg.activateWindow();
     if (dlg.exec() != QDialog::Accepted) return;
 
     // Parse final values
