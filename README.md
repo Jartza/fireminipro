@@ -82,6 +82,12 @@ On macOS:
 ./build/fireminipro.app/Contents/MacOS/fireminipro
 ```
 
+Or alternatively, if you are brave (untested!):
+```brew tap Jartza/fireminipro
+brew install --build-from-source fireminipro
+```
+After which you can start fireminipro from command-line.
+
 On Linux:
 ```bash
 ./build/fireminipro
