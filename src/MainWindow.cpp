@@ -49,6 +49,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool v." FIREMINIPRO_VERSION);
     this->setMinimumSize(1030,768);
 
+    // Window container
+    auto *w = new QWindow();
+    winContainer = QWidget::createWindowContainer(w, central);
+
     // Menu bar
     auto *mb = menuBar();
 
@@ -978,16 +982,7 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     const qulonglong fileSize = static_cast<qulonglong>(file.size());
 
     // 2) Ask for offset/length/pad now that we know the file size
-    QDialog dlg(this);
-#if defined(Q_OS_MACOS)
-    dlg.setWindowModality(Qt::WindowModal);
-#else
-    dlg.setWindowFlag(Qt::Tool);
-    dlg.setWindowModality(Qt::ApplicationModal);
-    dlg.setWindowFlag(Qt::WindowTitleHint);
-    dlg.setWindowFlag(Qt::WindowSystemMenuHint, false);
-    dlg.setAttribute(Qt::WA_ShowWithoutActivating, false);
-#endif
+    QDialog dlg(winContainer);
     dlg.setWindowTitle(tr("Load file to buffer"));
     dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
