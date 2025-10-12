@@ -29,9 +29,10 @@ if(_fireminipro_version STREQUAL "0.0.0")
   endif()
 endif()
 
+string(REGEX REPLACE "^v" "" _numeric_version "${_fireminipro_version}")
 project(fireminipro VERSION 0.0.0 LANGUAGES CXX)
 set(PROJECT_VERSION "${_fireminipro_version}")
-set(FIREMINIPRO_VERSION_STRING "${PROJECT_VERSION}")
+set(FIREMINIPRO_VERSION_STRING "${_numeric_version}")
 
 # --- Qt setup ---
 set(CMAKE_CXX_STANDARD 17)
