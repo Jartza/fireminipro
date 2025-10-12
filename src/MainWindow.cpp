@@ -978,7 +978,7 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     const qulonglong fileSize = static_cast<qulonglong>(file.size());
 
     // 2) Ask for offset/length/pad now that we know the file size
-    QDialog dlg(this, Qt::Tool);
+    QDialog dlg(this);
     dlg.setWindowTitle(tr("Load file to buffer"));
     dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
