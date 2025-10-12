@@ -45,7 +45,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool v." FIREMINIPRO_VERSION);
+    setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool " FIREMINIPRO_VERSION);
     this->setMinimumSize(1030,768);
 
     // Menu bar
