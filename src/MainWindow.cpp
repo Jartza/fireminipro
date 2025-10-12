@@ -627,10 +627,10 @@ QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
     if (!filters.isEmpty()) {
         dialog.setNameFilters(filters.split(QStringLiteral(";;")));
     }
-#if defined(Q_OS_MACOS)
+
     dialog.setWindowFlag(Qt::Sheet);
     dialog.setWindowModality(Qt::WindowModal);
-#endif
+
     QString selected;
     if (dialog.exec() == QDialog::Accepted) {
         const QStringList files = dialog.selectedFiles();
@@ -671,9 +671,15 @@ void MainWindow::clearChipInfo()
 
 void MainWindow::saveBufferToFile() {
     if (buffer_.isEmpty()) { log->appendPlainText("[Info] Buffer is empty"); return; }
+#if defined(Q_OS_MACOS)
     const QString path = pickFile(tr("Save image"),
                                   QFileDialog::AcceptSave,
                                   tr("Binary (*.bin);;All files (*)"));
+#else
+    const QString path = QFileDialog::getSaveFileName(this,
+        tr("Save image"), lastPath_,
+        tr("Binary (*.bin);;All files (*)"));
+#endif
     if (path.isEmpty()) return;
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
@@ -947,11 +953,20 @@ void MainWindow::loadAtOffsetDialog(QString path) {
 
     // If preset path is given, skip the file picker dialog
     if (path.isEmpty()) {
+#if defined(Q_OS_MACOS)
         path = pickFile(tr("Pick image"),
                         QFileDialog::AcceptOpen,
                         tr("All files (*);;Binary (*.bin)"));
+#else
+        path = QFileDialog::getOpenFileName(this,
+                tr("Pick image"), lastPath_,
+                tr("All files (*);;Binary (*.bin)"));
+#endif
         if (path.isEmpty()) return;
     }
+#if !defined(Q_OS_MACOS)
+    lastPath_ = QFileInfo(path).absolutePath();
+#endif
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
