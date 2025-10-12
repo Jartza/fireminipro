@@ -36,6 +36,14 @@ Install dependencies using [Homebrew](https://brew.sh/):
 brew install cmake ninja qt6 minipro
 ```
 
+Either follow the build instruction below, or if you are brave, instead of above line, use the following:
+```brew tap Jartza/fireminipro
+brew install --build-from-source fireminipro
+```
+After which you can start fireminipro from command-line.
+
+
+
 ### Linux (Ubuntu/Debian)
 You need Minipro and the development toolchain for Qt6 and CMake.  
 Install required packages using:
@@ -81,12 +89,6 @@ On macOS:
 ```bash
 ./build/fireminipro.app/Contents/MacOS/fireminipro
 ```
-
-Or alternatively, if you are brave (untested!):
-```brew tap Jartza/fireminipro
-brew install --build-from-source fireminipro
-```
-After which you can start fireminipro from command-line.
 
 On Linux:
 ```bash
