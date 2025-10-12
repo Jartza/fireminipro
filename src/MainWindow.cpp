@@ -627,11 +627,10 @@ QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
     if (!filters.isEmpty()) {
         dialog.setNameFilters(filters.split(QStringLiteral(";;")));
     }
-#ifdef Q_OS_MAC
+#if defined(Q_OS_MACOS)
     dialog.setWindowFlag(Qt::Sheet);
     dialog.setWindowModality(Qt::WindowModal);
 #endif
-
     QString selected;
     if (dialog.exec() == QDialog::Accepted) {
         const QStringList files = dialog.selectedFiles();
