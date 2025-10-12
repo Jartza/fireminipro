@@ -37,38 +37,15 @@ jobs:
           curl -L "https://gitlab.com/DavidGriffith/minipro/-/archive/${MINIPRO_VERSION}/minipro-${MINIPRO_VERSION}.tar.bz2" -o minipro.tar.bz2
           tar xf minipro.tar.bz2
           cd "minipro-${MINIPRO_VERSION}"
-          sed -i 's/^UDEV_DIR=/UDEV_DIR?=/' Makefile
-          sed -i 's/^COMPLETIONS_DIR=/COMPLETIONS_DIR?=/' Makefile
-          patch <<'PATCH'
-*** Begin Patch
-*** Update File: Makefile
-@@
--SHARE_INSTDIR=$(DESTDIR)$(PREFIX)/share/minipro
-+SHARE_INSTDIR?=$(PREFIX)/share/minipro
-+INSTALL_SHARE_INSTDIR=$(DESTDIR)$(SHARE_INSTDIR)
-@@
--install-algorithm: algorithm
--	cp $(ALGORITHM) $(SHARE_INSTDIR)
-+install-algorithm: algorithm
-+	mkdir -p $(INSTALL_SHARE_INSTDIR)
-+	cp $(ALGORITHM) $(INSTALL_SHARE_INSTDIR)
-@@
--	mkdir -p $(SHARE_INSTDIR)
-+	mkdir -p $(INSTALL_SHARE_INSTDIR)
-@@
--	cp $(INFOIC) $(SHARE_INSTDIR)/
--	cp $(LOGICIC) $(SHARE_INSTDIR)/
-+	cp $(INFOIC) $(INSTALL_SHARE_INSTDIR)/
-+	cp $(LOGICIC) $(INSTALL_SHARE_INSTDIR)/
-@@
--	rm -f $(SHARE_INSTDIR)/$(INFOIC)
--	rm -f $(SHARE_INSTDIR)/$(LOGICIC)
--	rm -f $(SHARE_INSTDIR)/$(ALGORITHM)
-+	rm -f $(INSTALL_SHARE_INSTDIR)/$(INFOIC)
-+	rm -f $(INSTALL_SHARE_INSTDIR)/$(LOGICIC)
-+	rm -f $(INSTALL_SHARE_INSTDIR)/$(ALGORITHM)
-*** End Patch
-PATCH
+          sed -i 's#^UDEV_DIR=#UDEV_DIR?=#' Makefile
+          sed -i 's#^COMPLETIONS_DIR=#COMPLETIONS_DIR?=#' Makefile
+          sed -i 's#^SHARE_INSTDIR=$(DESTDIR)$(PREFIX)/share/minipro#SHARE_INSTDIR?=$(PREFIX)/share/minipro#' Makefile
+          sed -i '/^SHARE_INSTDIR?=$(PREFIX)\/share\/minipro/a INSTALL_SHARE_INSTDIR=$(DESTDIR)$(SHARE_INSTDIR)' Makefile
+          sed -i 's#mkdir -p $(SHARE_INSTDIR)#mkdir -p $(INSTALL_SHARE_INSTDIR)#' Makefile
+          sed -i 's#cp $(ALGORITHM) $(SHARE_INSTDIR)#cp $(ALGORITHM) $(INSTALL_SHARE_INSTDIR)#' Makefile
+          sed -i 's#cp $(INFOIC) $(SHARE_INSTDIR)#cp $(INFOIC) $(INSTALL_SHARE_INSTDIR)#' Makefile
+          sed -i 's#cp $(LOGICIC) $(SHARE_INSTDIR)#cp $(LOGICIC) $(INSTALL_SHARE_INSTDIR)#' Makefile
+          sed -i 's#rm -f $(SHARE_INSTDIR)#rm -f $(INSTALL_SHARE_INSTDIR)#' Makefile
           make PREFIX=/usr SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR=
           make PREFIX=/usr DESTDIR="$MINIPRO_STAGING" SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR= install
       - name: Fetch linuxdeploy tooling
