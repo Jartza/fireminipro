@@ -617,6 +617,32 @@ static inline QString prettyBytes(qulonglong b) {
             .arg(QString::number(b, 16).toUpper());
 }
 
+QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
+                             const QString &filters)
+{
+    QFileDialog dialog(this, title, lastPath_);
+    dialog.setAcceptMode(mode);
+    dialog.setFileMode(mode == QFileDialog::AcceptSave ? QFileDialog::AnyFile
+                                                       : QFileDialog::ExistingFile);
+    if (!filters.isEmpty()) {
+        dialog.setNameFilters(filters.split(QStringLiteral(";;")));
+    }
+#ifdef Q_OS_MAC
+    dialog.setWindowFlag(Qt::Sheet);
+    dialog.setWindowModality(Qt::WindowModal);
+#endif
+
+    QString selected;
+    if (dialog.exec() == QDialog::Accepted) {
+        const QStringList files = dialog.selectedFiles();
+        if (!files.isEmpty()) {
+            selected = files.first();
+            lastPath_ = QFileInfo(selected).absolutePath();
+        }
+    }
+    return selected;
+}
+
 void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
 {
     // graceful fallbacks for partial info
@@ -646,8 +672,9 @@ void MainWindow::clearChipInfo()
 
 void MainWindow::saveBufferToFile() {
     if (buffer_.isEmpty()) { log->appendPlainText("[Info] Buffer is empty"); return; }
-    const QString path = QFileDialog::getSaveFileName(this, tr("Save image"), lastPath_,
-        tr("Binary (*.bin);;All files (*)"));
+    const QString path = pickFile(tr("Save image"),
+                                  QFileDialog::AcceptSave,
+                                  tr("Binary (*.bin);;All files (*)"));
     if (path.isEmpty()) return;
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
@@ -921,8 +948,9 @@ void MainWindow::loadAtOffsetDialog(QString path) {
 
     // If preset path is given, skip the file picker dialog
     if (path.isEmpty()) {
-        path = QFileDialog::getOpenFileName(this, tr("Pick image"), lastPath_,
-            tr("All files (*);;Binary (*.bin)"));
+        path = pickFile(tr("Pick image"),
+                        QFileDialog::AcceptOpen,
+                        tr("All files (*);;Binary (*.bin)"));
         if (path.isEmpty()) return;
     }
 

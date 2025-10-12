@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QFileDialog>
 #include <QByteArray>
 #include <QStringList>
 #include "ProcessHandling.h"
@@ -27,6 +28,9 @@ private slots:
     void loadAtOffsetDialog(QString path = {});
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
+
+    QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
+                     const QString &filters = QString());
 
 private:
     // Target and device
