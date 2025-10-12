@@ -1,7 +1,7 @@
 class Fireminipro < Formula
   desc "GUI frontend for the minipro programmer"
   homepage "https://github.com/Jartza/fireminipro"
-  url "https://github.com/Jartza/fireminipro/archive/refs/tags/v0.0.2.tar.gz"
+  url "https://github.com/Jartza/fireminipro/archive/refs/tags/v0.0.3.tar.gz"
   sha256 "…"
   license "MIT"
 
