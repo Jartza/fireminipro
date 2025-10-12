@@ -87,11 +87,13 @@ private:
         qulonglong length{};
         QString    label;
         QString    note;
+        qulonglong id{};
     };
 
     // Buffer segment legend
     QList<BufferSegment> bufferSegments{};
     QTableWidget *legendTable{};
+    qulonglong nextSegmentId_ = 1;
 
     // Process handling helper
     ProcessHandling *proc{};

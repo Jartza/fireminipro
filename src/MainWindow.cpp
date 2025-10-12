@@ -1189,16 +1189,18 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
         if (hasLeftRemainder || hasRightRemainder) anyPartialOverlap = true;
 
         if (hasLeftRemainder)
-            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, QStringLiteral(" (partial)") });
+            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, QStringLiteral(" (partial)") , seg.id });
 
         // middle overlapped portion is dropped
 
         if (hasRightRemainder)
-            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, QStringLiteral(" (partial)") });
+            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, QStringLiteral(" (partial)") , seg.id });
     }
 
+    const qulonglong thisInsertId = nextSegmentId_++;
     out.append(BufferSegment{ nBeg, length, label,
-                              anyPartialOverlap ? QStringLiteral(" (overlap)") : QString() });
+                              anyPartialOverlap ? QStringLiteral(" (overlap)") : QString(),
+                              thisInsertId });
 
     std::sort(out.begin(), out.end(),
               [](const BufferSegment &a, const BufferSegment &b){ return a.start < b.start; });
@@ -1207,7 +1209,9 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
     for (const auto &s : std::as_const(out)) {
         if (!coalesced.isEmpty()) {
             auto &back = coalesced.last();
-            const bool sameTag    = (back.label == s.label) && (back.note == s.note);
+            const bool sameTag    = (back.label == s.label)
+                                   && (back.note == s.note)
+                                   && (back.id == s.id);
             const bool contiguous = (back.start + back.length == s.start);
             if (sameTag && contiguous) { back.length += s.length; continue; }
         }
