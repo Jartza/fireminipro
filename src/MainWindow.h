@@ -98,9 +98,6 @@ private:
     // Process handling helper
     ProcessHandling *proc{};
 
-    // Window container
-    QWidget *winContainer{};
-
     // If selected device is a logic IC
     bool currentIsLogic_ = false;
 
