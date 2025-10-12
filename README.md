@@ -37,7 +37,8 @@ brew install cmake ninja qt6 minipro
 ```
 
 Either follow the build instruction below, or if you are brave, instead of above line, use the following:
-```brew tap Jartza/fireminipro
+```bash
+brew tap Jartza/fireminipro
 brew install --build-from-source fireminipro
 ```
 After which you can start fireminipro from command-line.
