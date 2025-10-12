@@ -13,6 +13,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev patchelf \
+            pkg-config libusb-1.0-0-dev zlib1g-dev \
             qt6-base-dev qt6-base-dev-tools qt6-tools-dev qt6-tools-dev-tools
       - name: Make Qt6 qmake discoverable
         run: |
@@ -27,6 +28,16 @@ jobs:
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/qt6
           ninja -C build
+      - name: Build minipro CLI
+        env:
+          MINIPRO_VERSION: 0.7.4
+          MINIPRO_PREFIX: ${{ github.workspace }}/minipro-install
+        run: |
+          curl -L "https://gitlab.com/DavidGriffith/minipro/-/archive/${MINIPRO_VERSION}/minipro-${MINIPRO_VERSION}.tar.bz2" -o minipro.tar.bz2
+          tar xf minipro.tar.bz2
+          cd "minipro-${MINIPRO_VERSION}"
+          make PREFIX="$MINIPRO_PREFIX"
+          make PREFIX="$MINIPRO_PREFIX" install
       - name: Fetch linuxdeploy tooling
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -54,6 +65,22 @@ jobs:
           export LINUXDEPLOY_PLUGIN_QT_QMAKE=$PWD/ci-tools/qmake
           mkdir -p AppDir/usr/bin AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/256x256/apps
           cp build/fireminipro AppDir/usr/bin/
+          if [ -f "$GITHUB_WORKSPACE/minipro-install/bin/minipro" ]; then
+            cp "$GITHUB_WORKSPACE/minipro-install/bin/minipro" AppDir/usr/bin/
+            chmod +x AppDir/usr/bin/minipro
+            if [ -d "$GITHUB_WORKSPACE/minipro-install/share/minipro" ]; then
+              mkdir -p AppDir/usr/share
+              cp -R "$GITHUB_WORKSPACE/minipro-install/share/minipro" AppDir/usr/share/
+            fi
+            if [ -d "$GITHUB_WORKSPACE/minipro-install/share/doc" ]; then
+              mkdir -p AppDir/usr/share/doc
+              cp -R "$GITHUB_WORKSPACE/minipro-install/share/doc" AppDir/usr/share/doc/
+            fi
+            if [ -d "$GITHUB_WORKSPACE/minipro-install/share/licenses" ]; then
+              mkdir -p AppDir/usr/share/licenses
+              cp -R "$GITHUB_WORKSPACE/minipro-install/share/licenses" AppDir/usr/share/licenses/
+            fi
+          fi
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \
@@ -62,10 +89,15 @@ jobs:
             'Icon=fireminipro' \
             'Categories=Development;Utility;' > AppDir/usr/share/applications/fireminipro.desktop
           cp resources/appicon.png AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png
+          extra_flags=()
+          if [ -f AppDir/usr/bin/minipro ]; then
+            extra_flags+=(--executable AppDir/usr/bin/minipro)
+          fi
           ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/fireminipro \
             -d AppDir/usr/share/applications/fireminipro.desktop \
             -i AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png \
+            "${extra_flags[@]}" \
             --plugin qt --output appimage
       - name: Upload release asset
         uses: softprops/action-gh-release@v2

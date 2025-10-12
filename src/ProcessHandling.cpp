@@ -3,10 +3,10 @@
 #include <QRegularExpression>
 #include <QTextStream>
 #include <QStandardPaths>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
-#include <QStandardPaths>
 
 namespace {
 // Remove simple ANSI CSI sequences like "\x1B[K", "\x1B[2K", etc.
@@ -67,17 +67,37 @@ ProcessHandling::ProcessHandling(QObject *parent)
 }
 
 QString ProcessHandling::resolveMiniproPath() {
-    QString bin = QStandardPaths::findExecutable("minipro");
-    if (bin.isEmpty()) {
-        const QStringList candidates = {
-            "/opt/homebrew/bin/minipro",
-            "/usr/local/bin/minipro",
-            "/usr/bin/minipro"
-        };
-        for (const QString &c : candidates) {
-            if (QFileInfo::exists(c)) { bin = c; break; }
+    QString bin = QStandardPaths::findExecutable(QStringLiteral("minipro"));
+
+    QStringList candidates;
+
+    // In AppImage/runtime environments APPDIR points to the mounted bundle.
+    const QString appDir = qEnvironmentVariable("APPDIR");
+    if (!appDir.isEmpty()) {
+        candidates << (appDir + "/usr/bin/minipro");
+    }
+
+    // Fall back to the directory containing the executable (covers local bundles).
+    const QString execDir = QCoreApplication::applicationDirPath();
+    if (!execDir.isEmpty()) {
+        candidates << (execDir + "/minipro");
+#ifdef Q_OS_MAC
+        candidates << (execDir + "/../Resources/minipro");
+#endif
+    }
+
+    candidates << QStringLiteral("/opt/homebrew/bin/minipro")
+               << QStringLiteral("/usr/local/bin/minipro")
+               << QStringLiteral("/usr/bin/minipro");
+
+    for (const QString &candidate : candidates) {
+        QFileInfo info(candidate);
+        if (info.exists() && info.isExecutable()) {
+            bin = info.absoluteFilePath();
+            break;
         }
     }
+
     if (bin.isEmpty()) bin = "minipro";
     return bin;
 }
