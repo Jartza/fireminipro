@@ -61,7 +61,7 @@ sudo apt install build-essential ninja-build cmake libgl1-mesa-dev qt6-base-dev 
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/fireminipro.git
+git clone https://github.com/Jartza/fireminipro.git
 cd fireminipro
 ```
 
