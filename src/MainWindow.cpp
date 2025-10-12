@@ -979,17 +979,15 @@ void MainWindow::loadAtOffsetDialog(QString path) {
 
     // 2) Ask for offset/length/pad now that we know the file size
     QDialog dlg(this);
+#if defined(Q_OS_MACOS)
     dlg.setWindowModality(Qt::WindowModal);
-    dlg.setWindowFlag(Qt::Dialog);
+#else
+    dlg.setWindowFlag(Qt::Tool);
+    dlg.setWindowModality(Qt::ApplicationModal);
     dlg.setWindowFlag(Qt::WindowTitleHint);
-    dlg.setWindowFlag(Qt::CustomizeWindowHint, false);
     dlg.setWindowFlag(Qt::WindowSystemMenuHint, false);
-    dlg.winId();
-    if (auto *dlgWin = dlg.windowHandle()) {
-        if (auto *parentWin = windowHandle()) {
-            dlgWin->setTransientParent(parentWin);
-        }
-    }
+    dlg.setAttribute(Qt::WA_ShowWithoutActivating, false);
+#endif
     dlg.setWindowTitle(tr("Load file to buffer"));
     dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
