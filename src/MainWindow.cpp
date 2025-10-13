@@ -32,6 +32,7 @@
 #include <QApplication>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QFontDatabase>
 #include <algorithm>
 
 #include "ProcessHandling.h"
@@ -312,6 +313,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
+    logFontDefault_ = log->font();
+    logFontFixed_ = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    logFontFixed_.setPointSizeF(this->font().pointSizeF() - 1);
+
+    applyLogFontForDevice();
 
     rightSplitter->addWidget(tableHex);
     rightSplitter->addWidget(legendTable);
@@ -602,6 +608,21 @@ void MainWindow::updateActionEnabling() {
     }
 }
 
+void MainWindow::applyLogFontForDevice() {
+    if (!log) return;
+    if (currentIsLogic_) {
+        QFont mono = logFontFixed_;
+        if (mono.family().isEmpty()) {
+            mono = logFontDefault_;
+        } else {
+            mono.setPointSizeF(logFontDefault_.pointSizeF());
+        }
+        log->setFont(mono);
+    } else {
+        log->setFont(logFontDefault_);
+    }
+}
+
 QStringList MainWindow::optionFlags() const {
     QStringList f;
     if (chkSkipVerify->isChecked())    f << "-v";
@@ -660,6 +681,7 @@ void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
     }
     chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
 
+    applyLogFontForDevice();
     updateActionEnabling();
 }
 

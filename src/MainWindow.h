@@ -70,6 +70,8 @@ private:
     // Views
     QTableView     *tableHex{};
     QPlainTextEdit *log{};
+    QFont logFontDefault_;
+    QFont logFontFixed_;
 
     // Hex view model
     HexView *hexModel{};
@@ -104,6 +106,7 @@ private:
     // Buffer legend manipulation
     void updateLegendTable();
     void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);
+    void applyLogFontForDevice();
 
     // Helpers
     QStringList optionFlags() const;

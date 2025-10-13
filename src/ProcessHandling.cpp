@@ -342,7 +342,12 @@ void ProcessHandling::handleStdout() {
     for (QString ln : lines) {
         if (ln.isEmpty()) continue;
 
-        ln = stripAnsi(ln).trimmed();
+        if (mode_ == Mode::Logic) {
+            ln = stripAnsi(ln);
+        } else {
+            // Remove ANSI sequences for non-logic modes
+            ln = stripAnsi(ln).trimmed();
+        }
         stdoutBuffer_.append(ln + "\n");
 
         // We want to log only specific output
