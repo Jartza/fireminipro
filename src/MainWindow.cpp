@@ -992,6 +992,8 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     // Determine effective length: default to full file if length omitted/invalid
     const qulonglong effLen = (len == 0) ? fileSize : len;
 
+    const qulonglong bufferSizeBefore = static_cast<qulonglong>(buffer_.size());
+
     // Build a data block of effLen: file bytes then padding (if requested > file)
     QByteArray data;
     data.reserve(static_cast<int>(effLen));
@@ -999,9 +1001,20 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     data.append(file.left(static_cast<int>(take)));
     if (effLen > take) data.append(QByteArray(static_cast<int>(effLen - take), char(pad & 0xFF)));
 
+    const qulonglong prePadLen  = (off > bufferSizeBefore) ? (off - bufferSizeBefore) : 0;
+    const qulonglong postPadLen = (effLen > take) ? (effLen - take) : 0;
+
     // Patch the buffer with PAD used also for growth between current size and offset
     patchBuffer(static_cast<int>(off), data, char(pad & 0xFF));
-    addSegmentAndRefresh(off, effLen, QFileInfo(path).fileName());
+    QString displayName = QFileInfo(path).fileName();
+    if (prePadLen > 0 || postPadLen > 0) {
+        QStringList parts;
+        if (prePadLen > 0)  parts << tr("pre:%1").arg(QLocale().toString(prePadLen));
+        if (postPadLen > 0) parts << tr("post:%1").arg(QLocale().toString(postPadLen));
+        const QString padByteText = QString::number(pad & 0xFF, 16).toUpper().rightJustified(2, QLatin1Char('0'));
+        displayName += QString(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
+    }
+    addSegmentAndRefresh(off, effLen, displayName);
     lastPath_ = QFileInfo(path).absolutePath();
 
     log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
