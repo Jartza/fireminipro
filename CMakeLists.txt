@@ -80,7 +80,14 @@ if(APPLE)
   set(APPICON_ICNS "${CMAKE_CURRENT_BINARY_DIR}/appicon.icns")
   set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appicon.icns"
-    "${CMAKE_CURRENT_BINARY_DIR}/appicon.iconset")
+    "${CMAKE_CURRENT_BINARY_DIR}/appicon.iconset"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app"
+    )
+  set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/appicon.icns"
+    "${CMAKE_CURRENT_BINARY_DIR}/appicon.iconset"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app"
+  )
 
   # If a prebuilt icns is provided in the source tree, prefer that.
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/appicon.icns")
