@@ -149,13 +149,6 @@ if(APPLE)
       MACOSX_BUNDLE_ICON_FILE "${_icns_stem}"
     )
 
-    set(MACOS_BUNDLE_IDENTIFIER "com.firebay.fireminipro")
-    set(_plist_in "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in")
-    set(_plist_out "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
-    configure_file("${_plist_in}" "${_plist_out}" @ONLY)
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-      MACOSX_BUNDLE_INFO_PLIST "${_plist_out}"
-    )
   endif()
 endif()
 
