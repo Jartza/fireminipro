@@ -8,45 +8,6 @@
 #include <QDir>
 #include <QDateTime>
 
-namespace {
-// Remove simple ANSI CSI sequences like "\x1B[K", "\x1B[2K", etc.
-static inline QString stripAnsi(QString s) {
-    static QRegularExpression ansiRe(R"(\x1B\[[0-9;]*[A-Za-z])");
-    return s.remove(ansiRe);
-}
-
-// Return 0–100 if a % is found, otherwise -1
-static int extractPercent(const QString& line)
-{
-    // Treat “... OK” endings as 100%, e.g. “123.4 ms  OK”, “12.0 Sec OK”, “Verification OK”
-    static const QRegularExpression okTail(
-        R"((?:ms|sec)?\s*ok\s*$|verification\s*ok\s*$)",
-        QRegularExpression::CaseInsensitiveOption);
-    if (okTail.match(line).hasMatch())
-        return 100;
-
-    static QRegularExpression re(R"((\d{1,3})\s*%)");
-    auto m = re.match(line);
-    if (!m.hasMatch()) return -1;
-
-    bool ok = false;
-    int pct = m.captured(1).toInt(&ok);
-    return (ok && pct >= 0 && pct <= 100) ? pct : -1;
-}
-
-static QString detectPhaseText(const QString& line)
-{
-    static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
-        QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression rd(R"(\bReading\s*Code\.\.\.)",
-        QRegularExpression::CaseInsensitiveOption);
-
-    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
-    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
-    return {};
-}
-} // namespace
-
 // Constructor
 ProcessHandling::ProcessHandling(QObject *parent)
     : QObject(parent)
@@ -462,4 +423,37 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     }
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
+}
+
+QString ProcessHandling::stripAnsi(QString s) {
+    static QRegularExpression ansiRe(R"(\x1B\[[0-9;]*[A-Za-z])");
+    return s.remove(ansiRe);
+}
+
+int ProcessHandling::extractPercent(const QString &line) {
+    // Treat “… OK” endings as 100%, e.g. “123.4 ms  OK”, “12.0 Sec OK”, “Verification OK”
+    static const QRegularExpression okTail(
+        R"((?:ms|sec)?\s*ok\s*$|verification\s*ok\s*$)",
+        QRegularExpression::CaseInsensitiveOption);
+    if (okTail.match(line).hasMatch())
+        return 100;
+
+    static QRegularExpression re(R"((\d{1,3})\s*%)");
+    auto m = re.match(line);
+    if (!m.hasMatch()) return -1;
+
+    bool ok = false;
+    int pct = m.captured(1).toInt(&ok);
+    return (ok && pct >= 0 && pct <= 100) ? pct : -1;
+}
+
+QString ProcessHandling::detectPhaseText(const QString &line) {
+    static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression rd(R"(\bReading\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+
+    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
+    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
+    return {};
 }

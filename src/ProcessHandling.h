@@ -96,5 +96,8 @@ private:
     void startMinipro(Mode mode, const QStringList& args);
     QStringList parseProgrammerList(const QString &text) const;
     ChipInfo parseChipInfo(const QString &text) const;
+    static QString stripAnsi(QString s);
+    static int extractPercent(const QString &line);
+    static QString detectPhaseText(const QString &line);
     QProcess process_;
 };
