@@ -981,8 +981,6 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     dlg.setWindowTitle(tr("Load file to buffer"));
     dlg.setMinimumSize(560, 260);          // give headroom for large numbers
     dlg.setSizeGripEnabled(true);          // user can grow the dialog
-    dlg.raise();
-    dlg.activateWindow();
 
     auto *grid = new QGridLayout(&dlg);
     auto *leftForm = new QFormLayout();
@@ -1104,6 +1102,8 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     QObject::connect(editPad, &QLineEdit::textChanged, &dlg, updateInfo);
 
     updateInfo();
+    dlg.raise();
+    dlg.activateWindow();
     if (dlg.exec() != QDialog::Accepted) return;
 
     // Parse final values
