@@ -81,12 +81,10 @@ if(APPLE)
   set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appicon.icns"
     "${CMAKE_CURRENT_BINARY_DIR}/appicon.iconset"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app"
     )
   set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES
     "${CMAKE_CURRENT_BINARY_DIR}/appicon.icns"
     "${CMAKE_CURRENT_BINARY_DIR}/appicon.iconset"
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.app"
   )
 
   # If a prebuilt icns is provided in the source tree, prefer that.
@@ -138,6 +136,8 @@ if(APPLE)
 
   # If we have an icns (generated or prebuilt), add it to the bundle.
   if(APPICON_ICNS)
+    get_filename_component(_icns_name "${APPICON_ICNS}" NAME)
+    get_filename_component(_icns_stem "${APPICON_ICNS}" NAME_WE)
     # Put the icns into the app bundle's Resources folder
     set_source_files_properties("${APPICON_ICNS}" PROPERTIES
       MACOSX_PACKAGE_LOCATION "Resources"
@@ -145,9 +145,16 @@ if(APPLE)
     target_sources(${PROJECT_NAME} PRIVATE "${APPICON_ICNS}")
 
     # Tell macOS which icon file to use (filename only)
-    get_filename_component(_icns_name "${APPICON_ICNS}" NAME)
     set_target_properties(${PROJECT_NAME} PROPERTIES
-      MACOSX_BUNDLE_ICON_FILE "${_icns_name}"
+      MACOSX_BUNDLE_ICON_FILE "${_icns_stem}"
+    )
+
+    set(MACOS_BUNDLE_IDENTIFIER "com.firebay.fireminipro")
+    set(_plist_in "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in")
+    set(_plist_out "${CMAKE_CURRENT_BINARY_DIR}/Info.plist")
+    configure_file("${_plist_in}" "${_plist_out}" @ONLY)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+      MACOSX_BUNDLE_INFO_PLIST "${_plist_out}"
     )
   endif()
 endif()
@@ -160,8 +167,15 @@ endif()
 #   MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
 # )
 if(APPLE)
+  if(NOT DEFINED _icns_name OR _icns_name STREQUAL "")
+    set(_icns_name "appicon.icns")
+  endif()
   add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${APPICON_ICNS}" "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/${_icns_name}"
+    COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Resources/${_icns_name}"
+    COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>/Contents/Info.plist"
     COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_BUNDLE_DIR:${PROJECT_NAME}>
-    COMMENT "Touching app bundle to refresh Finder icon"
+    COMMAND /bin/sh -c "/usr/bin/osascript -e 'tell application \\\"Finder\\\" to update POSIX file \\\"$<TARGET_BUNDLE_DIR:${PROJECT_NAME}>\\\"' || true"
+    COMMENT "Touching bundle assets to refresh Finder icon"
   )
 endif()
