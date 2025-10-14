@@ -98,22 +98,31 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Target group
     auto *groupTargets = new QGroupBox("Target", leftBox);
     auto *gridT = new QGridLayout(groupTargets);
-    comboProgrammer = new QComboBox(groupTargets);
-    comboDevice = new QComboBox(groupTargets);
     auto *lblProg = new QLabel("Programmer:", groupTargets);
     auto *lblDev  = new QLabel("Device:",     groupTargets);
+    comboProgrammer = new QComboBox(groupTargets);
+    comboDevice = new QComboBox(groupTargets);
+    btnRescan = new QPushButton("Rescan", groupTargets);
     QFont small = this->font();
     small.setPointSizeF(this->font().pointSizeF() - 1);
     lblProg->setFont(small);
     lblDev->setFont(small);
-    btnRescan = new QPushButton("Rescan programmers", groupTargets);
+
     gridT->addWidget(lblProg,         0, 0);
     gridT->addWidget(comboProgrammer, 0, 1);
     gridT->addWidget(lblDev,          1, 0);
-    gridT->addWidget(comboDevice,     1, 1);
-    gridT->addWidget(btnRescan,       2, 0, 1, 2, Qt::AlignRight);
+    gridT->addWidget(comboDevice,     1, 1, 1, 2);
+    gridT->addWidget(btnRescan,       0, 2, 1, 1, Qt::AlignRight | Qt::AlignTop);
+    
+    comboProgrammer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    comboDevice->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    btnRescan->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+
     gridT->setColumnStretch(0, 0);
     gridT->setColumnStretch(1, 1);
+    gridT->setColumnStretch(2, 0);
+    gridT->setHorizontalSpacing(4);
+
     comboProgrammer->setPlaceholderText("No programmer");
     comboDevice->setPlaceholderText("No devices");
     groupTargets->setLayout(gridT);
@@ -838,7 +847,7 @@ void MainWindow::onDevicesScanned(const QStringList &names)
     comboProgrammer->clear();
 
     if (names.isEmpty()) {
-        comboProgrammer->setPlaceholderText("No programmer found");
+        comboProgrammer->setPlaceholderText("No programmer");
         if (log) log->appendPlainText("[Error] No programmer found.");
         // (Optional) disable actions that need a programmer here
         return;
