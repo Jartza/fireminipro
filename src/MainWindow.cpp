@@ -320,6 +320,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     legendTable->verticalHeader()->setVisible(false);
     legendTable->setAlternatingRowColors(true);
     legendTable->setMinimumHeight(152);
+    connect(segmentModel, &SegmentView::rowReordered,
+            this, &MainWindow::onSegmentRowReordered);
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
@@ -1079,6 +1081,51 @@ void MainWindow::updateLegendTable() {
 
     segmentModel->setSegments(std::move(rows));
     if (legendTable) legendTable->resizeRowsToContents();
+}
+
+void MainWindow::onSegmentRowReordered(int from, int to) {
+    if (from == to) return;
+    if (bufferSegments.isEmpty()) return;
+    if (from < 0 || from >= bufferSegments.size()) return;
+
+    BufferSegment moving = bufferSegments.at(from);
+    const qulonglong maxLen = (moving.start < qulonglong(buffer_.size()))
+                            ? std::min<qulonglong>(moving.length,
+                                                   qulonglong(buffer_.size()) - moving.start)
+                            : 0;
+    if (maxLen == 0) return;
+
+    const int segStart = static_cast<int>(moving.start);
+    const int segLen   = static_cast<int>(maxLen);
+    QByteArray segmentData = buffer_.mid(segStart, segLen);
+    if (segmentData.size() != segLen) return;
+
+    buffer_.remove(segStart, segLen);
+    bufferSegments.removeAt(from);
+    const qulonglong removedLen = maxLen;
+    for (int i = from; i < bufferSegments.size(); ++i) {
+        bufferSegments[i].start -= removedLen;
+    }
+
+    int insertIndex = std::clamp(to, 0, static_cast<int>(bufferSegments.size()));
+
+    qulonglong insertStart = (insertIndex < bufferSegments.size())
+                           ? bufferSegments[insertIndex].start
+                           : qulonglong(buffer_.size());
+
+    for (int i = insertIndex; i < bufferSegments.size(); ++i) {
+        bufferSegments[i].start += removedLen;
+    }
+
+    moving.start  = insertStart;
+    moving.length = removedLen;
+    bufferSegments.insert(insertIndex, moving);
+    buffer_.insert(static_cast<int>(insertStart), segmentData);
+
+    updateLegendTable();
+    if (legendTable) legendTable->selectRow(insertIndex);
+    if (legendTable) legendTable->scrollTo(legendTable->model()->index(insertIndex, 0));
+    if (hexModel) hexModel->setBufferRef(&buffer_);
 }
 
 void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label) {

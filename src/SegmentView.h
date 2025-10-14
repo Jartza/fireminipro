@@ -35,6 +35,9 @@ public:
     void clear();
     QVector<Segment> segments() const;
 
+signals:
+    void rowReordered(int from, int to);
+
 private:
     QVector<Segment> rows_;
 

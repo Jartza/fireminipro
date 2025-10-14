@@ -28,6 +28,7 @@ private slots:
     void loadAtOffsetDialog(QString path = {});
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
+    void onSegmentRowReordered(int from, int to);
 
     QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
                      const QString &filters = QString());

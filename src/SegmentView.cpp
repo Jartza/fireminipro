@@ -139,6 +139,7 @@ bool SegmentView::moveRows(const QModelIndex &sourceParent, int sourceRow, int c
     for (int i = 0; i < count; ++i) rows_.insert(insertRow + i, moved.at(i));
 
     endMoveRows();
+    emit rowReordered(sourceRow, insertRow);
     return true;
 }
 
