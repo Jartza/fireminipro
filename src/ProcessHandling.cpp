@@ -281,6 +281,9 @@ void ProcessHandling::fetchSupportedDevices(const QString &programmer)
 // Fetch chip info for a given programmer and device (minipro -q <programmer> -d "<dev>")
 void ProcessHandling::fetchChipInfo(const QString &programmer, const QString &device)
 {
+    // Stupid fix for QComboBox emitting signal twice
+    if (mode_ == Mode::ChipInfo) return;
+
     // Chip info needs programmer and device: -q <programmer> -d <dev>
     QStringList args;
     if (!programmer.isEmpty())
