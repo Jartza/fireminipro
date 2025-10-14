@@ -34,6 +34,7 @@ private slots:
     void onSegmentRowReordered(int from, int to);
     void onLegendRowDoubleClicked(const QModelIndex &index);
     void onLegendFilesDropped(int row, const QList<QUrl> &urls);
+    void onLegendContextMenuRequested(const QPoint &pos);
 
     QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
                      const QString &filters = QString());
@@ -114,6 +115,8 @@ private:
     void updateLegendTable();
     void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);
     void applyLogFontForDevice();
+    void deleteSegmentAt(int row);
+    void fillSegmentWithValue(int row, quint8 value);
 
     // Helpers
     QStringList optionFlags() const;

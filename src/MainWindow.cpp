@@ -10,6 +10,8 @@
 #include <QSplitter>
 #include <QTableView>
 #include <QAbstractItemView>
+#include <QMenu>
+#include <QAction>
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QHeaderView>
@@ -322,12 +324,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     legendTable->verticalHeader()->setVisible(false);
     legendTable->setAlternatingRowColors(true);
     legendTable->setMinimumHeight(152);
+    legendTable->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(segmentModel, &SegmentView::rowReordered,
             this, &MainWindow::onSegmentRowReordered);
     connect(legendTable, &QTableView::doubleClicked,
             this, &MainWindow::onLegendRowDoubleClicked);
     connect(legendTable, &SegmentTableView::externalFilesDropped,
             this, &MainWindow::onLegendFilesDropped);
+    connect(legendTable, &SegmentTableView::customContextMenuRequested,
+            this, &MainWindow::onLegendContextMenuRequested);
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
@@ -1225,6 +1230,112 @@ void MainWindow::onLegendFilesDropped(int row, const QList<QUrl> &urls) {
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
     updateActionEnabling();
+}
+
+void MainWindow::onLegendContextMenuRequested(const QPoint &pos) {
+    if (!legendTable) return;
+    const QModelIndex index = legendTable->indexAt(pos);
+    if (!index.isValid()) return;
+    const int row = index.row();
+    if (row < 0 || row >= bufferSegments.size()) return;
+
+    const auto &seg = bufferSegments.at(row);
+    QMenu menu(legendTable);
+    const QString displayLabel = seg.label.isEmpty() ? tr("Segment") : seg.label;
+    QAction *deleteAction = menu.addAction(tr("Delete \"%1\"").arg(displayLabel));
+    QAction *fillAction   = menu.addAction(tr("Fill \"%1\" with 0xFF").arg(displayLabel));
+
+    const QPoint globalPos = legendTable->viewport()->mapToGlobal(pos);
+    QAction *chosen = menu.exec(globalPos);
+    if (!chosen) return;
+
+    if (chosen == deleteAction) {
+        deleteSegmentAt(row);
+    } else if (chosen == fillAction) {
+        fillSegmentWithValue(row, 0xFF);
+    }
+}
+
+void MainWindow::deleteSegmentAt(int row) {
+    if (row < 0 || row >= bufferSegments.size()) return;
+    const BufferSegment seg = bufferSegments.at(row);
+    const qulonglong bufferSize = static_cast<qulonglong>(buffer_.size());
+    const QString displayName = seg.label.isEmpty() ? tr("segment") : seg.label;
+    if (seg.length == 0) {
+        bufferSegments.removeAt(row);
+        if (log) log->appendPlainText(tr("[Segment] Removed empty %1").arg(displayName));
+    } else if (seg.start >= bufferSize) {
+        bufferSegments.removeAt(row);
+        if (log) log->appendPlainText(tr("[Segment] Removed out-of-range %1").arg(displayName));
+    } else {
+        const qulonglong available = bufferSize - seg.start;
+        const qulonglong effectiveLen = std::min(seg.length, available);
+        const int start = static_cast<int>(seg.start);
+        const int len = static_cast<int>(effectiveLen);
+        if (len > 0) buffer_.remove(start, len);
+        bufferSegments.removeAt(row);
+        for (int i = row; i < bufferSegments.size(); ++i) {
+            bufferSegments[i].start -= effectiveLen;
+        }
+        if (log) {
+            log->appendPlainText(tr("[Segment] Deleted %1 bytes from 0x%2 (%3)")
+                                 .arg(QLocale().toString(effectiveLen))
+                                 .arg(QString::number(seg.start, 16).toUpper())
+                                 .arg(displayName));
+        }
+    }
+
+    updateLegendTable();
+    if (legendTable) {
+        if (!bufferSegments.isEmpty()) {
+            const int last = static_cast<int>(bufferSegments.size() - 1);
+            const int selectRow = std::clamp(row, 0, last);
+            legendTable->selectRow(selectRow);
+        } else {
+            legendTable->clearSelection();
+        }
+    }
+    if (hexModel) hexModel->setBufferRef(&buffer_);
+    if (lblBufSize) {
+        lblBufSize->setText(QString("Size: %1 (0x%2)")
+                            .arg(QLocale().toString(buffer_.size()))
+                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+    }
+    updateActionEnabling();
+}
+
+void MainWindow::fillSegmentWithValue(int row, quint8 value) {
+    if (row < 0 || row >= bufferSegments.size()) return;
+    auto &segment = bufferSegments[row];
+    const qulonglong bufferSize = static_cast<qulonglong>(buffer_.size());
+    if (segment.start >= bufferSize || segment.length == 0) return;
+
+    const qulonglong available = bufferSize - segment.start;
+    const qulonglong effectiveLen = std::min(segment.length, available);
+    if (effectiveLen == 0) return;
+
+    const int start = static_cast<int>(segment.start);
+    const int len = static_cast<int>(effectiveLen);
+    const char fillChar = static_cast<char>(value);
+    for (int i = 0; i < len; ++i) {
+        buffer_[start + i] = fillChar;
+    }
+
+    segment.label = tr("Fill 0x%1").arg(QString::number(value, 16).toUpper().rightJustified(2, QLatin1Char('0')));
+    segment.note.clear();
+
+    updateLegendTable();
+    if (legendTable && segmentModel) {
+        legendTable->selectRow(row);
+        legendTable->scrollTo(segmentModel->index(row, 0), QAbstractItemView::PositionAtCenter);
+    }
+    if (hexModel) hexModel->setBufferRef(&buffer_);
+    if (log) {
+        log->appendPlainText(tr("[Segment] Filled %1 bytes at 0x%2 with 0x%3")
+                             .arg(QLocale().toString(effectiveLen))
+                             .arg(QString::number(segment.start, 16).toUpper())
+                             .arg(QString::number(value, 16).toUpper().rightJustified(2, QLatin1Char('0'))));
+    }
 }
 
 void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label) {
