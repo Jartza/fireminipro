@@ -473,11 +473,12 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             mode_ = Mode::Idle;
             emit errorLine(QString("[Write error] exit=%1").arg(exitCode));
         }
+    } else {
+        mode_ = Mode::Idle;
     }
 
     // All operations eventually end up here, send finished() signal to
     // release the UI.
-    mode_ = Mode::Idle;
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
 }
