@@ -102,7 +102,10 @@ bool SegmentView::dropMimeData(const QMimeData *data, Qt::DropAction action, int
         destinationRow = parent.isValid() ? parent.row() : rows_.size();
     }
 
-    if (destinationRow > sourceRow) destinationRow -= 1;
+    if (destinationRow > sourceRow) {
+        if (destinationRow < rows_.size())
+            destinationRow -= 1;
+    }
     if (destinationRow == sourceRow) return false;
 
     return moveRows(QModelIndex(), sourceRow, 1, QModelIndex(), destinationRow);
