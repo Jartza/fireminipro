@@ -335,6 +335,49 @@ void ProcessHandling::sendResponse(const QString &input) {
     }
 }
 
+// Helpers for parsing progress and stripping ANSI/VT codes
+QString ProcessHandling::stripAnsi(QString s) {
+    static QRegularExpression ansiRe(R"(\x1B\[[0-9;]*[A-Za-z])");
+    return s.remove(ansiRe);
+}
+
+// Extract percentage from a line of text, or -1 if none found,
+// for progress bar updates. Handles "xx%", "xx %", and "… OK" endings.
+// OK is treated as 100%.
+int ProcessHandling::extractPercent(const QString &line) {
+    static const QRegularExpression okTail(
+        R"((?:ms|sec)?\s*ok\s*$|verification\s*ok\s*$)",
+        QRegularExpression::CaseInsensitiveOption);
+    if (okTail.match(line).hasMatch())
+        return 100;
+
+    static QRegularExpression re(R"((\d{1,3})\s*%)");
+    auto m = re.match(line);
+    if (!m.hasMatch()) return -1;
+
+    bool ok = false;
+    int pct = m.captured(1).toInt(&ok);
+    return (ok && pct >= 0 && pct <= 100) ? pct : -1;
+}
+
+// Detect phase text from a line, e.g. "Reading" or "Writing"
+// for progress bar text updates. Returns empty string if none found.
+QString ProcessHandling::detectPhaseText(const QString &line) {
+    static const QRegularExpression rd(R"(\bReading\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
+        QRegularExpression::CaseInsensitiveOption);
+
+    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
+    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
+    return {};
+}
+
+// Handle stdout+stderr (merged) from the process, parse progress and log lines.
+// Parses lines for errors/warnings and emits logLine() or errorLine() as needed.
+// Calls extractPercent() and detectPhaseText() to parse progress bar updates.
+// Adds ANSI-stripped lines to internal stdoutBuffer_ for later parsing by
+// the handleFinished() slot.
 void ProcessHandling::handleStdout() {
     const QString all = QString::fromLocal8Bit(process_.readAllStandardOutput());
 
@@ -384,26 +427,30 @@ void ProcessHandling::handleStdout() {
 }
 
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
+    // Scanning for devices
     if (mode_ == Mode::Scan) {
         const QStringList names = parseProgrammerList(stdoutBuffer_);
         mode_ = Mode::Idle;
         emit devicesScanned(names);
+    // Get list of supported devices
     } else if (mode_ == Mode::DeviceList) {
         QStringList devices = stdoutBuffer_.split('\n', Qt::SkipEmptyParts);
         for (QString &s : devices) {
             s = s.trimmed();
         }
-        // very light filtering
+        // very light filtering of device list, for empty lines, removing duplicates etc.
         devices.erase(std::remove_if(devices.begin(), devices.end(), [](const QString &s){
             return s.isEmpty();
         }), devices.end());
         devices.removeDuplicates();
         mode_ = Mode::Idle;
         emit devicesListed(devices);
+    // Get single chip info
     } else if (mode_ == Mode::ChipInfo) {
         const ChipInfo ci = parseChipInfo(stdoutBuffer_);
         mode_ = Mode::Idle;
         emit chipInfoReady(ci);
+    // Logic chip test
     } else if (mode_ == Mode::Reading) {
         const bool ok = (status == QProcess::NormalExit && exitCode == 0);
         // print debug info
@@ -414,6 +461,7 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             mode_ = Mode::Idle;
             emit errorLine(QString("[Read error] exit=%1").arg(exitCode));
         }
+    // Chip programming
     } else if (mode_ == Mode::Writing) {
         const bool ok = (status == QProcess::NormalExit && exitCode == 0);
         if (ok) {
@@ -423,42 +471,10 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             mode_ = Mode::Idle;
             emit errorLine(QString("[Write error] exit=%1").arg(exitCode));
         }
+    // Gneric operations (blank check, erase, logic test)
     } else {
         mode_ = Mode::Idle;
     }
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
-}
-
-QString ProcessHandling::stripAnsi(QString s) {
-    static QRegularExpression ansiRe(R"(\x1B\[[0-9;]*[A-Za-z])");
-    return s.remove(ansiRe);
-}
-
-int ProcessHandling::extractPercent(const QString &line) {
-    // Treat “… OK” endings as 100%, e.g. “123.4 ms  OK”, “12.0 Sec OK”, “Verification OK”
-    static const QRegularExpression okTail(
-        R"((?:ms|sec)?\s*ok\s*$|verification\s*ok\s*$)",
-        QRegularExpression::CaseInsensitiveOption);
-    if (okTail.match(line).hasMatch())
-        return 100;
-
-    static QRegularExpression re(R"((\d{1,3})\s*%)");
-    auto m = re.match(line);
-    if (!m.hasMatch()) return -1;
-
-    bool ok = false;
-    int pct = m.captured(1).toInt(&ok);
-    return (ok && pct >= 0 && pct <= 100) ? pct : -1;
-}
-
-QString ProcessHandling::detectPhaseText(const QString &line) {
-    static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
-        QRegularExpression::CaseInsensitiveOption);
-    static const QRegularExpression rd(R"(\bReading\s*Code\.\.\.)",
-        QRegularExpression::CaseInsensitiveOption);
-
-    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
-    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
-    return {};
 }
