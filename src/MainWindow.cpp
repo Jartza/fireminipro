@@ -37,6 +37,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QFontDatabase>
+#include <QSignalBlocker>
 #include <algorithm>
 #include <utility>
 
@@ -867,6 +868,7 @@ void MainWindow::onDevicesScanned(const QStringList &names)
 
 void MainWindow::onDevicesListed(const QStringList &names)
 {
+    QSignalBlocker blocker(comboDevice);
     comboDevice->clear();
 
     if (names.isEmpty()) {
