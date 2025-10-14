@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QByteArray>
 #include <QStringList>
+#include <QUrl>
 #include "ProcessHandling.h"
 
 class QComboBox;
@@ -17,6 +18,7 @@ class HexView;
 class QProgressBar;
 class SegmentView;
 class QModelIndex;
+class SegmentTableView;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -31,6 +33,7 @@ private slots:
     void onDevicesListed(const QStringList &names);
     void onSegmentRowReordered(int from, int to);
     void onLegendRowDoubleClicked(const QModelIndex &index);
+    void onLegendFilesDropped(int row, const QList<QUrl> &urls);
 
     QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
                      const QString &filters = QString());
@@ -97,7 +100,7 @@ private:
 
     // Buffer segment legend
     QList<BufferSegment> bufferSegments{};
-    QTableView *legendTable{};
+    SegmentTableView *legendTable{};
     SegmentView *segmentModel{};
     qulonglong nextSegmentId_ = 1;
 

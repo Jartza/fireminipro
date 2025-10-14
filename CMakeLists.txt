@@ -53,6 +53,7 @@ set(SOURCES
     src/ProcessHandling.cpp
     src/LoadPreviewBar.cpp
     src/SegmentView.cpp
+    src/SegmentTableView.cpp
 )
 set(HEADERS
     src/MainWindow.h
@@ -60,6 +61,7 @@ set(HEADERS
     src/ProcessHandling.h
     src/LoadPreviewBar.h
     src/SegmentView.h
+    src/SegmentTableView.h
 )
 
 # Use AUTORCC by listing the qrc directly here.

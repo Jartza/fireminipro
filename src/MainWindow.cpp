@@ -23,6 +23,7 @@
 #include <QLocale>
 #include <QPainter>
 #include "SegmentView.h"
+#include "SegmentTableView.h"
 #include <QVector>
 #include <QTimer>
 #include <QSortFilterProxyModel>
@@ -300,7 +301,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     tableHex = new QTableView(rightSplitter);
 
     // Buffer legend table
-    legendTable = new QTableView(rightSplitter);
+    legendTable = new SegmentTableView(rightSplitter);
     legendTable->setObjectName("bufferLegendTable");
     segmentModel = new SegmentView(legendTable);
     legendTable->setModel(segmentModel);
@@ -325,6 +326,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             this, &MainWindow::onSegmentRowReordered);
     connect(legendTable, &QTableView::doubleClicked,
             this, &MainWindow::onLegendRowDoubleClicked);
+    connect(legendTable, &SegmentTableView::externalFilesDropped,
+            this, &MainWindow::onLegendFilesDropped);
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
@@ -1157,6 +1160,71 @@ void MainWindow::onLegendRowDoubleClicked(const QModelIndex &index) {
     const QModelIndex targetIndex = hexModel->index(targetRow, targetColumn);
     if (!targetIndex.isValid()) return;
     tableHex->scrollTo(targetIndex, QAbstractItemView::PositionAtCenter);
+}
+
+void MainWindow::onLegendFilesDropped(int row, const QList<QUrl> &urls) {
+    if (urls.isEmpty()) return;
+
+    int insertIndex = std::clamp(row, 0, static_cast<int>(bufferSegments.size()));
+    qulonglong insertStart = (insertIndex < bufferSegments.size())
+                           ? bufferSegments[insertIndex].start
+                           : qulonglong(buffer_.size());
+
+    for (const QUrl &url : urls) {
+        if (!url.isLocalFile()) continue;
+        const QString path = url.toLocalFile();
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            if (log) log->appendPlainText(tr("[Error] Failed to open dropped file: %1").arg(path));
+            continue;
+        }
+        QByteArray data = file.readAll();
+        file.close();
+        if (data.isEmpty()) {
+            if (log) log->appendPlainText(tr("[Warn] Dropped file empty: %1").arg(path));
+            continue;
+        }
+
+        const qint64 len = data.size();
+        for (int i = insertIndex; i < bufferSegments.size(); ++i) {
+            bufferSegments[i].start += qulonglong(len);
+        }
+
+        buffer_.insert(static_cast<int>(insertStart), data);
+
+        BufferSegment seg;
+        seg.start  = insertStart;
+        seg.length = qulonglong(len);
+        seg.label  = QFileInfo(path).fileName();
+        seg.note   = {};
+        seg.id     = nextSegmentId_++;
+        bufferSegments.insert(insertIndex, seg);
+
+        if (log) {
+            log->appendPlainText(tr("[Dropped] %1 bytes at 0x%2 from %3")
+                                 .arg(QLocale().toString(qulonglong(len)))
+                                 .arg(QString::number(seg.start, 16).toUpper())
+                                 .arg(seg.label));
+        }
+
+        insertIndex += 1;
+        insertStart += qulonglong(len);
+    }
+
+    updateLegendTable();
+    if (legendTable && insertIndex > 0) {
+        const int selectRow = insertIndex - 1;
+        legendTable->selectRow(selectRow);
+        legendTable->scrollTo(segmentModel->index(selectRow, 0),
+                              QAbstractItemView::PositionAtCenter);
+    }
+    if (hexModel) hexModel->setBufferRef(&buffer_);
+    if (lblBufSize) {
+        lblBufSize->setText(QString("Size: %1 (0x%2)")
+                            .arg(QLocale().toString(buffer_.size()))
+                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+    }
+    updateActionEnabling();
 }
 
 void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label) {
