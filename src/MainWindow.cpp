@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QSplitter>
 #include <QTableView>
+#include <QAbstractItemView>
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QHeaderView>
@@ -322,6 +323,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     legendTable->setMinimumHeight(152);
     connect(segmentModel, &SegmentView::rowReordered,
             this, &MainWindow::onSegmentRowReordered);
+    connect(legendTable, &QTableView::doubleClicked,
+            this, &MainWindow::onLegendRowDoubleClicked);
 
     log = new QPlainTextEdit(rightSplitter);
     log->setReadOnly(true);
@@ -1126,6 +1129,34 @@ void MainWindow::onSegmentRowReordered(int from, int to) {
     if (legendTable) legendTable->selectRow(insertIndex);
     if (legendTable) legendTable->scrollTo(legendTable->model()->index(insertIndex, 0));
     if (hexModel) hexModel->setBufferRef(&buffer_);
+}
+
+void MainWindow::onLegendRowDoubleClicked(const QModelIndex &index) {
+    if (!index.isValid()) return;
+    const int row = index.row();
+    if (row < 0 || row >= bufferSegments.size()) return;
+    if (!hexModel || !tableHex) return;
+    if (buffer_.isEmpty()) return;
+
+    const int bytesPerRow = std::max(1, hexModel->getBytesPerRow());
+    const auto &segment = bufferSegments.at(row);
+    qulonglong start = segment.start;
+    if (start >= qulonglong(buffer_.size()))
+        start = buffer_.isEmpty() ? 0 : qulonglong(buffer_.size() - 1);
+
+    const int hexRowCount = hexModel->rowCount();
+    const int hexColCount = hexModel->columnCount();
+    if (hexRowCount <= 0 || hexColCount <= 0) return;
+
+    int targetRow = static_cast<int>(start / bytesPerRow);
+    targetRow = std::clamp(targetRow, 0, hexRowCount - 1);
+    int targetColumn = static_cast<int>((start % bytesPerRow) + 1);
+    if (targetColumn >= hexColCount) targetColumn = hexColCount - 1;
+    if (targetColumn < 0) targetColumn = 0;
+
+    const QModelIndex targetIndex = hexModel->index(targetRow, targetColumn);
+    if (!targetIndex.isValid()) return;
+    tableHex->scrollTo(targetIndex, QAbstractItemView::PositionAtCenter);
 }
 
 void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label) {

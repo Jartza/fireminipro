@@ -16,6 +16,7 @@ class QWidget;
 class HexView;
 class QProgressBar;
 class SegmentView;
+class QModelIndex;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,6 +30,7 @@ private slots:
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
     void onSegmentRowReordered(int from, int to);
+    void onLegendRowDoubleClicked(const QModelIndex &index);
 
     QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
                      const QString &filters = QString());
