@@ -153,9 +153,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         this, [this](int idx){
             updateActionEnabling();
             if (idx < 0) {
-                // Optional: if selection cleared, clear the chip info too
                 clearChipInfo();
+                return;
             }
+            if (!proc) return;
+            const QString p = comboProgrammer->currentText().trimmed();
+            const QString d = comboDevice->itemText(idx).trimmed();
+            if (p.isEmpty() || d.isEmpty()) return;
+            clearChipInfo();
+            proc->fetchChipInfo(p, d);
         });
 
     // fetch only on user action. Avoid fetching on every text change
