@@ -29,6 +29,7 @@ public:
 private slots:
     void saveBufferToFile();
     void loadAtOffsetDialog(QString path = {});
+    void loadFileAppendDialog();
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
     void onSegmentRowReordered(int from, int to);
@@ -56,7 +57,8 @@ private:
 
     // Buffer group
     QPushButton *btnClear{};
-    QPushButton *btnLoad{};
+    QPushButton *btnLoadBinary{};
+    QPushButton *btnLoadAdvanced{};
     QPushButton *btnSave{};
     QPushButton *btnRead{};
     QPushButton *btnWrite{};

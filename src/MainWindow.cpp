@@ -241,7 +241,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnRead      = new QPushButton("Read from target",  groupBuffer);
     btnWrite     = new QPushButton("Write to target", groupBuffer);
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
-    btnLoad      = new QPushButton("Load file to buffer", groupBuffer);
+    btnLoadBinary   = new QPushButton("Load file to buffer", groupBuffer);
+    btnLoadAdvanced = new QPushButton("Advanced load…", groupBuffer);
     progReadWrite = new QProgressBar(groupBuffer);
 
     progReadWrite->setRange(0, 100);
@@ -252,14 +253,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
 
-    gridB->addWidget(btnLoad,      0, 0, 1, 2);
-    gridB->addWidget(btnClear,     1, 0, 1, 1);
-    gridB->addWidget(btnSave,      1, 1, 1, 1);
-    gridB->addWidget(btnRead,      2, 0, 1, 1);
-    gridB->addWidget(btnWrite,     2, 1, 1, 1);
-    gridB->addWidget(chkAsciiSwap, 3, 0, 1, 2);
-    gridB->addWidget(lblBufSize,   4, 0, 1, 2);
-    gridB->addWidget(progReadWrite,5, 0, 1, 2);
+    gridB->addWidget(btnLoadBinary,   0, 0, 1, 1);
+    gridB->addWidget(btnLoadAdvanced, 0, 1, 1, 1);
+    gridB->addWidget(btnClear,        1, 0, 1, 1);
+    gridB->addWidget(btnSave,         1, 1, 1, 1);
+    gridB->addWidget(btnRead,         2, 0, 1, 1);
+    gridB->addWidget(btnWrite,        2, 1, 1, 1);
+    gridB->addWidget(chkAsciiSwap,    3, 0, 1, 2);
+    gridB->addWidget(lblBufSize,      4, 0, 1, 2);
+    gridB->addWidget(progReadWrite,   5, 0, 1, 2);
 
     groupBuffer->setLayout(gridB);
     leftLayout->addWidget(groupBuffer);
@@ -397,7 +399,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
-    connect(btnLoad, &QPushButton::clicked, this, [this]{
+    connect(btnLoadBinary, &QPushButton::clicked, this, &MainWindow::loadFileAppendDialog);
+    connect(btnLoadAdvanced, &QPushButton::clicked, this, [this]{
         loadAtOffsetDialog();
     });
     connect(comboDevice, &QComboBox::currentTextChanged,
@@ -580,7 +583,8 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
 
 void MainWindow::setUiEnabled(bool on) {
     // Enabled at boot
-    for (auto *w : std::vector<QWidget*>{btnRescan, btnClear, btnSave, btnRead, btnWrite})
+    for (auto *w : std::vector<QWidget*>{btnRescan, btnClear, btnSave, btnRead, btnWrite,
+                                         btnLoadBinary, btnLoadAdvanced})
         if (w) w->setEnabled(true);
     // Disabled at boot
     for (auto *w : std::vector<QWidget*>{comboProgrammer, comboDevice})
@@ -592,7 +596,8 @@ void MainWindow::disableBusyButtons()
 {
     for (QWidget *w : std::vector<QWidget*>{
         btnRead, btnWrite, btnEraseDevice, btnBlankCheck, btnTestLogic,
-        btnRescan, comboProgrammer, comboDevice, btnLoad, btnSave, btnClear
+        btnRescan, comboProgrammer, comboDevice, btnLoadBinary, btnLoadAdvanced,
+        btnSave, btnClear
     }) {
         if (w) w->setEnabled(false);
     }
@@ -608,8 +613,9 @@ void MainWindow::updateActionEnabling() {
     const bool hasBuffer      = !buffer_.isEmpty();
 
     // Common to all devices
-    if (btnClear)     btnClear->setEnabled(true);
-    if (btnLoad)      btnLoad->setEnabled(true);
+    if (btnClear)        btnClear->setEnabled(true);
+    if (btnLoadBinary)   btnLoadBinary->setEnabled(true);
+    if (btnLoadAdvanced) btnLoadAdvanced->setEnabled(true);
     if (chkAsciiSwap) chkAsciiSwap->setEnabled(hasBuffer);
     if (btnSave)      btnSave->setEnabled(hasBuffer);
 
@@ -865,6 +871,46 @@ void MainWindow::onDevicesListed(const QStringList &names)
 }
 
 // Load file to buffer at user-specified offset, with optional padding
+void MainWindow::loadFileAppendDialog() {
+    const QString path = pickFile(tr("Load binary"), QFileDialog::AcceptOpen,
+                                  tr("All files (*);;Binary (*.bin)"));
+    if (path.isEmpty()) return;
+
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
+        if (log) log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        return;
+    }
+
+    const QByteArray data = f.readAll();
+    if (data.isEmpty()) {
+        if (log) log->appendPlainText(tr("[Warn] File is empty: %1").arg(QFileInfo(path).fileName()));
+        return;
+    }
+
+    const qulonglong start = static_cast<qulonglong>(buffer_.size());
+    buffer_.append(data);
+    const qulonglong len = static_cast<qulonglong>(data.size());
+
+    addSegmentAndRefresh(start, len, QFileInfo(path).fileName());
+
+    if (hexModel) hexModel->setBufferRef(&buffer_);
+    if (lblBufSize) {
+        lblBufSize->setText(QString("Size: %1 (0x%2)")
+                            .arg(QLocale().toString(buffer_.size()))
+                            .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+    }
+
+    if (log) {
+        log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+                             .arg(QLocale().toString(len))
+                             .arg(QString::number(start, 16).toUpper())
+                             .arg(QFileInfo(path).fileName()));
+    }
+
+    updateActionEnabling();
+}
+
 void MainWindow::loadAtOffsetDialog(QString path) {
     // Sanitary cursor
     QApplication::restoreOverrideCursor();
