@@ -4,6 +4,7 @@
 #include <QFileDialog>
 #include <QByteArray>
 #include <QStringList>
+#include <QUrl>
 #include "ProcessHandling.h"
 
 class QComboBox;
@@ -14,8 +15,10 @@ class QCheckBox;
 class QLabel;
 class QWidget;
 class HexView;
-class QTableWidget;
 class QProgressBar;
+class SegmentView;
+class QModelIndex;
+class SegmentTableView;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -28,6 +31,10 @@ private slots:
     void loadAtOffsetDialog(QString path = {});
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
+    void onSegmentRowReordered(int from, int to);
+    void onLegendRowDoubleClicked(const QModelIndex &index);
+    void onLegendFilesDropped(int row, const QList<QUrl> &urls);
+    void onLegendContextMenuRequested(const QPoint &pos);
 
     QString pickFile(const QString &title, QFileDialog::AcceptMode mode,
                      const QString &filters = QString());
@@ -94,7 +101,8 @@ private:
 
     // Buffer segment legend
     QList<BufferSegment> bufferSegments{};
-    QTableWidget *legendTable{};
+    SegmentTableView *legendTable{};
+    SegmentView *segmentModel{};
     qulonglong nextSegmentId_ = 1;
 
     // Process handling helper
@@ -107,6 +115,8 @@ private:
     void updateLegendTable();
     void addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label);
     void applyLogFontForDevice();
+    void deleteSegmentAt(int row);
+    void fillSegmentWithValue(int row, quint8 value);
 
     // Helpers
     QStringList optionFlags() const;

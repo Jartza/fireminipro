@@ -52,12 +52,16 @@ set(SOURCES
     src/HexView.cpp
     src/ProcessHandling.cpp
     src/LoadPreviewBar.cpp
+    src/SegmentView.cpp
+    src/SegmentTableView.cpp
 )
 set(HEADERS
     src/MainWindow.h
     src/HexView.h
     src/ProcessHandling.h
     src/LoadPreviewBar.h
+    src/SegmentView.h
+    src/SegmentTableView.h
 )
 
 # Use AUTORCC by listing the qrc directly here.
