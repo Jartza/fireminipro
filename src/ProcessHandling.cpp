@@ -426,6 +426,8 @@ void ProcessHandling::handleStdout() {
     }
 }
 
+// Process has finished, parse final output based on mode and
+// emit appropriate signals.
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
     // Scanning for devices
     if (mode_ == Mode::Scan) {
@@ -471,10 +473,11 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
             mode_ = Mode::Idle;
             emit errorLine(QString("[Write error] exit=%1").arg(exitCode));
         }
-    // Gneric operations (blank check, erase, logic test)
-    } else {
-        mode_ = Mode::Idle;
     }
+
+    // All operations eventually end up here, send finished() signal to
+    // release the UI.
+    mode_ = Mode::Idle;
     stdoutBuffer_.clear();
     emit finished(exitCode, status);
 }
