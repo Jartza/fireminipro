@@ -14,8 +14,8 @@ class QCheckBox;
 class QLabel;
 class QWidget;
 class HexView;
-class QTableWidget;
 class QProgressBar;
+class SegmentView;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -94,7 +94,8 @@ private:
 
     // Buffer segment legend
     QList<BufferSegment> bufferSegments{};
-    QTableWidget *legendTable{};
+    QTableView *legendTable{};
+    SegmentView *segmentModel{};
     qulonglong nextSegmentId_ = 1;
 
     // Process handling helper

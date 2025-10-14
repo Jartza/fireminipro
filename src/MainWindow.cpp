@@ -21,8 +21,8 @@
 #include <QLineEdit>
 #include <QLocale>
 #include <QPainter>
-#include <QTableWidget>
-#include <QHeaderView>
+#include "SegmentView.h"
+#include <QVector>
 #include <QTimer>
 #include <QSortFilterProxyModel>
 #include <QCompleter>
@@ -34,6 +34,7 @@
 #include <QMessageBox>
 #include <QFontDatabase>
 #include <algorithm>
+#include <utility>
 
 #include "ProcessHandling.h"
 #include "MainWindow.h"
@@ -298,17 +299,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     tableHex = new QTableView(rightSplitter);
 
     // Buffer legend table
-    legendTable = new QTableWidget(rightSplitter);
+    legendTable = new QTableView(rightSplitter);
     legendTable->setObjectName("bufferLegendTable");
-    legendTable->setColumnCount(4);
-    legendTable->setHorizontalHeaderLabels({tr("Start"), tr("End"), tr("Size"), tr("File")});
+    segmentModel = new SegmentView(legendTable);
+    legendTable->setModel(segmentModel);
     legendTable->horizontalHeader()->setStretchLastSection(true);
     legendTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     legendTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     legendTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    legendTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
     legendTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    legendTable->setSelectionMode(QAbstractItemView::NoSelection);
-    legendTable->setFocusPolicy(Qt::NoFocus);
+    legendTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    legendTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    legendTable->setDragDropMode(QAbstractItemView::InternalMove);
+    legendTable->setDragDropOverwriteMode(false);
+    legendTable->setDefaultDropAction(Qt::MoveAction);
+    legendTable->setAcceptDrops(true);
+    legendTable->viewport()->setAcceptDrops(true);
+    legendTable->setFocusPolicy(Qt::StrongFocus);
+    legendTable->verticalHeader()->setVisible(false);
+    legendTable->setAlternatingRowColors(true);
     legendTable->setMinimumHeight(152);
 
     log = new QPlainTextEdit(rightSplitter);
@@ -1053,27 +1063,22 @@ void MainWindow::loadAtOffsetDialog(QString path) {
 }
 
 void MainWindow::updateLegendTable() {
-    if (!legendTable) return;
-    legendTable->setRowCount(bufferSegments.size());
-    int row = 0;
-    for (const auto &s : std::as_const(bufferSegments)) {
-        const qulonglong end = s.length ? (s.start + s.length - 1) : s.start;
-        auto *itStart = new QTableWidgetItem(QString("0x") + QString::number(s.start, 16));
-        auto *itEnd   = new QTableWidgetItem(QString("0x") + QString::number(end,   16));
-        auto *itSize  = new QTableWidgetItem(QString("%1 (0x%2)")
-                                             .arg(QString::number(s.length))
-                                             .arg(QString::number(s.length, 16)));
-        QString label = s.label;
-        if (!s.note.isEmpty()) label += s.note;
-        auto *itLabel = new QTableWidgetItem(label);
+    if (!segmentModel) return;
 
-        legendTable->setItem(row, 0, itStart);
-        legendTable->setItem(row, 1, itEnd);
-        legendTable->setItem(row, 2, itSize);
-        legendTable->setItem(row, 3, itLabel);
-        ++row;
+    QVector<SegmentView::Segment> rows;
+    rows.reserve(bufferSegments.size());
+    for (const auto &s : std::as_const(bufferSegments)) {
+        SegmentView::Segment seg;
+        seg.start  = s.start;
+        seg.length = s.length;
+        seg.label  = s.label;
+        seg.note   = s.note;
+        seg.id     = s.id;
+        rows.append(seg);
     }
-    legendTable->resizeRowsToContents();
+
+    segmentModel->setSegments(std::move(rows));
+    if (legendTable) legendTable->resizeRowsToContents();
 }
 
 void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const QString &label) {
