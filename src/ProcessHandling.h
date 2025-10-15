@@ -76,6 +76,8 @@ private slots:
     void handleFinished(int exitCode, QProcess::ExitStatus status);
 
 private:
+    void processOutputLine(QString line);
+
     // Internal mode to disambiguate generic runs vs scans
     enum class Mode { 
         Idle,
@@ -90,6 +92,7 @@ private:
 
     Mode    mode_{Mode::Idle};
     QString stdoutBuffer_;
+    QString stdoutFragment_;
     QString pendingTempPath_;
 
     QString resolveMiniproPath();

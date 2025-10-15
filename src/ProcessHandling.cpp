@@ -25,6 +25,7 @@ ProcessHandling::ProcessHandling(QObject *parent)
 
     mode_ = Mode::Idle;
     stdoutBuffer_.clear();
+    stdoutFragment_.clear();
 }
 
 QString ProcessHandling::resolveMiniproPath() {
@@ -210,6 +211,7 @@ void ProcessHandling::startMinipro(Mode mode, const QStringList& args)
     // Set mode first, then clear any previous buffered output
     mode_ = mode;
     stdoutBuffer_.clear();
+    stdoutFragment_.clear();
 
     // Unified QProcess setup
     process_.setProgram(bin);
@@ -377,59 +379,81 @@ QString ProcessHandling::detectPhaseText(const QString &line) {
 // Handle stdout+stderr (merged) from the process, parse progress and log lines.
 // Parses lines for errors/warnings and emits logLine() or errorLine() as needed.
 // Calls extractPercent() and detectPhaseText() to parse progress bar updates.
+void ProcessHandling::processOutputLine(QString ln) {
+    if (ln.isEmpty()) return;
+
+    if (mode_ == Mode::Logic) {
+        ln = stripAnsi(ln);
+    } else {
+        // Remove ANSI sequences for non-logic modes
+        ln = stripAnsi(ln).trimmed();
+    }
+
+    if (ln.isEmpty()) return;
+
+    stdoutBuffer_.append(ln + "\n");
+
+    // We want to log only specific output
+    if (ln.contains("error", Qt::CaseInsensitive)) {
+        emit errorLine(ln);
+    } else if (ln.contains("warning", Qt::CaseInsensitive)) {
+        if (!ln.contains("not yet complete", Qt::CaseInsensitive)) // ignore "not yet completed" warnings
+            emit logLine(ln);
+    } else if (ln.contains("invalid", Qt::CaseInsensitive)) {
+        emit errorLine(ln);
+    } else if (ln.contains("incorrect", Qt::CaseInsensitive)) {
+        emit errorLine(ln);
+    } else if (ln.contains("failed", Qt::CaseInsensitive)) {
+        emit errorLine(ln);
+    } else if (ln.contains("can't", Qt::CaseInsensitive)) {
+        emit errorLine(ln);
+    } else if (ln.contains("is blank", Qt::CaseInsensitive)) {
+        emit logLine(ln);
+    } else if (ln.contains("success", Qt::CaseInsensitive)) {
+        emit logLine(ln);
+    } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
+        emit logLine(ln);
+    } else if (mode_ == Mode::Logic) {
+        emit logLine(ln);
+    }
+
+    // Parse possible progress from stdout too
+    const int pct = extractPercent(ln);
+    const QString phase = detectPhaseText(ln);
+    if (pct >= 0 && pct <= 100) {
+        emit progress(pct, phase);
+    }
+}
+
 // Adds ANSI-stripped lines to internal stdoutBuffer_ for later parsing by
 // the handleFinished() slot.
 void ProcessHandling::handleStdout() {
-    const QString all = QString::fromLocal8Bit(process_.readAllStandardOutput());
+    const QByteArray raw = process_.readAllStandardOutput();
+    if (raw.isEmpty() && stdoutFragment_.isEmpty()) return;
 
-    const auto lines = all.split('\n');
-    for (QString ln : lines) {
-        if (ln.isEmpty()) continue;
+    QString chunk = QString::fromLocal8Bit(raw);
+    chunk.replace("\r\n", "\n");
+    chunk.replace('\r', '\n');
+    stdoutFragment_.append(chunk);
 
-        if (mode_ == Mode::Logic) {
-            ln = stripAnsi(ln);
-        } else {
-            // Remove ANSI sequences for non-logic modes
-            ln = stripAnsi(ln).trimmed();
-        }
-        stdoutBuffer_.append(ln + "\n");
-
-        // We want to log only specific output
-        if (ln.contains("error", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
-        } else if (ln.contains("warning", Qt::CaseInsensitive)) {
-            if (!ln.contains("not yet complete", Qt::CaseInsensitive)) // ignore "not yet completed" warnings
-                emit logLine(ln);
-        } else if (ln.contains("invalid", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
-        } else if (ln.contains("incorrect", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
-        } else if (ln.contains("failed", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
-        } else if (ln.contains("can't", Qt::CaseInsensitive)) {
-            emit errorLine(ln);
-        } else if (ln.contains("is blank", Qt::CaseInsensitive)) {
-            emit logLine(ln);
-        } else if (ln.contains("success", Qt::CaseInsensitive)) {
-            emit logLine(ln);
-        } else if (ln.endsWith(" ok", Qt::CaseInsensitive)) {
-            emit logLine(ln);
-        } else if (mode_ == Mode::Logic) {
-            emit logLine(ln);
-        }
-
-        // Parse possible progress from stdout too
-        const int pct = extractPercent(ln);
-        const QString phase = detectPhaseText(ln);
-        if (pct >= 0 && pct <= 100) {
-            emit progress(pct, phase);
-        }
+    int newlineIndex = -1;
+    while ((newlineIndex = stdoutFragment_.indexOf('\n')) != -1) {
+        QString line = stdoutFragment_.left(newlineIndex);
+        stdoutFragment_.remove(0, newlineIndex + 1);
+        processOutputLine(line);
     }
 }
 
 // Process has finished, parse final output based on mode and
 // emit appropriate signals.
 void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) {
+    // Drain any remaining output that might not have triggered readyRead.
+    handleStdout();
+    if (!stdoutFragment_.isEmpty()) {
+        processOutputLine(stdoutFragment_);
+        stdoutFragment_.clear();
+    }
+
     // Scanning for devices
     if (mode_ == Mode::Scan) {
         const QStringList names = parseProgrammerList(stdoutBuffer_);
