@@ -76,6 +76,8 @@ qt_add_executable(${PROJECT_NAME} MACOSX_BUNDLE
     resources/icons.qrc
 )
 
+target_compile_definitions(${PROJECT_NAME} PRIVATE QT_NO_DBUS)
+
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
 # Expose PROJECT_VERSION to C++ as FIREMINIPRO_VERSION
 target_compile_definitions(${PROJECT_NAME}
