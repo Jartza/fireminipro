@@ -30,8 +30,8 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 
 ## Releases
 
-If you do not feel comfortable building software yourself, there is
-**AppImage for Linux** and **DMG for MacOs** (12 and up) are provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
+If you do not feel comfortable building software yourself, there are
+**AppImage for Linux** and **DMG for MacOs** (12 and up) provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
 
 ---
 
