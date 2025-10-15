@@ -37,7 +37,8 @@ jobs:
           arch -x86_64 codesign --force --deep --sign - build/fireminipro.app
       - name: Create DMG
         run: |
-          mkdir -p dist
+          rm -rf dist
+          cp -av /Users/firebay/github-runner/3rd_party/dist dist
           cp -R build/fireminipro.app dist/
           arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_intel.dmg
       - name: Get latest tag (for manual trigger)
