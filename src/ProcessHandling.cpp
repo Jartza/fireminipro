@@ -29,41 +29,39 @@ ProcessHandling::ProcessHandling(QObject *parent)
 
 QString ProcessHandling::resolveMiniproPath() {
     QString bin = QStandardPaths::findExecutable(QStringLiteral("minipro"));
-
-    // Resolve bundled share directory so we can point MINIPRO_HOME to it.
-    auto bundledShareDir = []() -> QString {
-        const QString appDirEnv = qEnvironmentVariable("APPDIR");
-        if (!appDirEnv.isEmpty()) {
-            return appDirEnv + "/usr/share/minipro";
-        }
-        const QString execDir = QCoreApplication::applicationDirPath();
-        if (!execDir.isEmpty()) {
-            QDir dir(execDir);
-            if (dir.cd("../share/minipro")) {
-                return dir.canonicalPath();
-            }
-        }
-        return {};
-    }();
-    if (!bundledShareDir.isEmpty()) {
-        qputenv("MINIPRO_HOME", bundledShareDir.toUtf8());
-    }
-
     QStringList candidates;
 
-    // In AppImage/runtime environments APPDIR points to the mounted bundle.
     const QString appDir = qEnvironmentVariable("APPDIR");
     if (!appDir.isEmpty()) {
         candidates << (appDir + "/usr/bin/minipro");
     }
 
-    // Fall back to the directory containing the executable (covers local bundles).
     const QString execDir = QCoreApplication::applicationDirPath();
+    QString bundledShareDir;
     if (!execDir.isEmpty()) {
         candidates << (execDir + "/minipro");
 #ifdef Q_OS_MAC
         candidates << (execDir + "/../Resources/minipro");
+        QDir resDir(execDir);
+        if (resDir.cd("../Resources/minipro")) {
+            bundledShareDir = resDir.canonicalPath();
+        }
 #endif
+        if (bundledShareDir.isEmpty()) {
+            QDir shareDir(execDir);
+            if (shareDir.cd("../share/minipro")) {
+                bundledShareDir = shareDir.canonicalPath();
+            }
+        }
+    }
+
+    if (bundledShareDir.isEmpty() && !appDir.isEmpty()) {
+        const QString shareCandidate = appDir + "/usr/share/minipro";
+        if (QFileInfo::exists(shareCandidate)) bundledShareDir = shareCandidate;
+    }
+
+    if (!bundledShareDir.isEmpty()) {
+        qputenv("MINIPRO_HOME", bundledShareDir.toUtf8());
     }
 
     candidates << QStringLiteral("/opt/homebrew/bin/minipro")
