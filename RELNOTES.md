@@ -26,12 +26,19 @@ The AppImage is fully self-contained; it should run on a clean Ubuntu/Debian ins
 
 Because the DMG is ad-hoc signed, macOS will block the first launch. Allow it via:
 
-1. Open the `.dmg` and drag `fireminipro.app` into **Applications**.
-2. Launch it once from Applications—macOS shows a warning dialog.
-3. Open **System Settings → Privacy & Security** (use the link in the dialog’s `?` help).
-4. Scroll down to “fireminipro.app was blocked…” and click **Open Anyway**.
-5. Confirm in the new dialog (also **Open Anyway**) and authenticate.
-6. Future launches will succeed normally.
+- Open the `.dmg` and drag `fireminipro.app` into **Applications**.
+
+Two options to make it work, either:
+
+1. Launch it once from Applications—macOS shows a warning dialog.
+2. Open **System Settings → Privacy & Security** (use the link in the dialog’s `?` help).
+3. Scroll down to “fireminipro.app was blocked…” and click **Open Anyway**.
+4. Confirm in the new dialog (also **Open Anyway**) and authenticate.
+5. Future launches will succeed normally.
+
+Of if you are more at home with Terminal / command-line:
+
+`sudo xattr -dr com.apple.quarantine /Applications/fireminipro.app`
 
 No additional Homebrew prerequisites are required: the DMG already contains `minipro`, `libusb`, and the Minipro XML data.
 
