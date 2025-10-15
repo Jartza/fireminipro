@@ -16,11 +16,23 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+
+          - name: Extract version from tag
+        id: get_version
+        run: |
+          RAW_TAG="${GITHUB_REF_NAME}"
+          # Remove leading 'v'
+          VERSION="${RAW_TAG#v}"
+          # Remove trailing commit hash if present
+          VERSION="${VERSION%%-g*}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Configure & Build (x86_64)
         run: |
           export PATH="$QT_HOME/bin:$PATH"
           arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$QT_HOME" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           arch -x86_64 ninja -C build
+
       - name: Bundle minipro (x86_64)
         run: |
           DIST_DIR="/Users/firebay/github-runner/3rd_party/minipro-dist-x86_64"
@@ -30,20 +42,24 @@ jobs:
           rsync -a "$DIST_DIR/MacOS/"       build/fireminipro.app/Contents/MacOS/
           rsync -a "$DIST_DIR/Frameworks/"  build/fireminipro.app/Contents/Frameworks/
           rsync -a "$DIST_DIR/Resources/"   build/fireminipro.app/Contents/Resources/
+
       - name: Deploy Qt into .app bundle
         run: |
           export PATH="$QT_HOME/bin:$PATH"
           arch -x86_64 "$QT_HOME/bin/macdeployqt" build/fireminipro.app -verbose=2
+
       - name: Ad-hoc sign app bundle
         run: |
           arch -x86_64 xattr -cr build/fireminipro.app
           arch -x86_64 codesign --force --deep --sign - build/fireminipro.app
+
       - name: Create DMG
         run: |
           rm -rf dist
           cp -av /Users/firebay/github-runner/3rd_party/dist dist
           cp -R build/fireminipro.app dist/
-          arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_intel.dmg
+          arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO "build/fireminipro_${{ steps.get_version.outputs.version }}_x86_64.dmg"
+
       - name: Set release tag name
         id: set_tag
         run: |
@@ -57,10 +73,11 @@ jobs:
             TAG_NAME="${GITHUB_REF_NAME}"
           fi
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: build/*.dmg
+          files: build/fireminipro_*_x86_64.dmg
           tag_name: ${{ steps.set_tag.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
