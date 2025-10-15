@@ -136,6 +136,17 @@ On Linux:
 This project is released under the MIT License.  
 See [LICENSE](LICENSE) for details.
 
+### Third-party components
+
+FireMinipro bundles a few external utilities inside the macOS and Linux packages.  
+The corresponding source archives and licence texts live in [`thirdparty/`](thirdparty/):
+
+- **minipro 0.7.4** (GPLv3) by David Griffith – used to communicate with TL866/T48/T56 programmers.  
+- **libusb 1.0.29** (LGPL 2.1) – runtime dependency required by `minipro`.
+
+The DMG/AppImage builds copy the relevant licences into `Resources/thirdparty/` so users
+always have access to the attribution and source information.
+
 ---
 
 ## Acknowledgements
