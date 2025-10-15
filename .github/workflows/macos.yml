@@ -1,5 +1,5 @@
 # .github/workflows/macos.yml
-name: macOS DMG
+name: macOS DMG Apple Silicon
 on:
   push:
     tags: ["v*"]
@@ -7,23 +7,21 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: Firebay-MacOS12
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      QT_HOME: "/Users/firebay/Qt/6.9.3/macos"
     steps:
       - uses: actions/checkout@v4
-      - name: Install deps
-        run: |
-          brew update
-          brew install cmake ninja qt@6
-          echo "$(brew --prefix qt@6)/bin" >> "$GITHUB_PATH"
       - name: Configure & Build
         run: |
-          qt_prefix=$(brew --prefix qt@6)
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$qt_prefix"
+          export PATH="$QT_HOME/bin:$PATH"
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="$QT_HOME" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           ninja -C build
       - name: Deploy Qt into .app bundle
         run: |
-          qt_prefix=$(brew --prefix qt@6)
-          "$qt_prefix/bin/macdeployqt" build/fireminipro.app -verbose=2
+          export PATH="$QT_HOME/bin:$PATH"
+          "$QT_HOME/bin/macdeployqt" build/fireminipro.app -verbose=2
       - name: Ad-hoc sign app bundle
         run: |
           xattr -cr build/fireminipro.app
@@ -32,10 +30,17 @@ jobs:
         run: |
           mkdir -p dist
           cp -R build/fireminipro.app dist/
-          hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro.dmg
+          hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_arm64.dmg
+      - name: Get latest tag (for manual trigger)
+        id: get_tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          latest_tag=$(git tag --sort=-creatordate | head -n 1)
+          echo "tag_name=$latest_tag" >> $GITHUB_OUTPUT
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: build/*.dmg
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && steps.get_tag.outputs.tag_name || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
