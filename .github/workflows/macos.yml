@@ -16,13 +16,11 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Extract version from tag
+      - name: Determine build version
         id: get_version
         run: |
-          RAW_TAG="${GITHUB_REF_NAME}"
-          # Remove leading 'v'
-          VERSION="${RAW_TAG#v}"
-          # Remove trailing commit hash if present
+          VERSION=$(git describe --tags --always --match "v[0-9]*" || echo "${GITHUB_REF_NAME}")
+          VERSION="${VERSION#v}"
           VERSION="${VERSION%%-g*}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
