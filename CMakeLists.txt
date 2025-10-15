@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 
+if(APPLE)
+  if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET OR CMAKE_OSX_DEPLOYMENT_TARGET STREQUAL "")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version" FORCE)
+  endif()
+endif()
+
 # ---- Derive version string ----
 set(_fireminipro_version "0.0.0")
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")

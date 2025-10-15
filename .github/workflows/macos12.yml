@@ -1,4 +1,4 @@
-# .github/workflows/macos.yml
+# .github/workflows/macos12.yml
 name: macOS DMG OS12
 on:
   push:
@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: Firebay-MacOS12
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
       - uses: actions/checkout@v4
       - name: Install deps (x86_64)
@@ -18,7 +20,7 @@ jobs:
       - name: Configure & Build (x86_64)
         run: |
           qt_prefix=$(/usr/local/bin/brew --prefix qt@6)
-          arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$qt_prefix"
+          arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$qt_prefix" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           arch -x86_64 ninja -C build
       - name: Deploy Qt into .app bundle
         run: |
