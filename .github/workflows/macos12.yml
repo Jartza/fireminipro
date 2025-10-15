@@ -12,11 +12,6 @@ jobs:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
     steps:
       - uses: actions/checkout@v4
-      - name: Install deps (x86_64)
-        run: |
-          arch -x86_64 /usr/local/bin/brew update
-          arch -x86_64 /usr/local/bin/brew install cmake ninja qt@6
-          echo "$(/usr/local/bin/brew --prefix qt@6)/bin" >> "$GITHUB_PATH"
       - name: Configure & Build (x86_64)
         run: |
           qt_prefix=$(/usr/local/bin/brew --prefix qt@6)
