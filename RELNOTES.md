@@ -3,9 +3,9 @@
 Find releases from [here](https://github.com/Jartza/fireminipro/releases/)
 
 **Packages provided**
-- `fireminipro_arm64.dmg` – MacOs Apple Silicon (macOS 12+)
-- `fireminipro_intel.dmg` – MacOs Intel (macOS 12+)
-- `FireMinipro-x86_64.AppImage` – Linux (x86_64)
+- `fireminipro_<ver>_arm64.dmg` – MacOs Apple Silicon (macOS 12+)
+- `fireminipro_<ver>_intel.dmg` – MacOs Intel (macOS 12+)
+- `FireMinipro-<ver>-x86_64.AppImage` – Linux (x86_64)
 
 All builds bundle the open-source **minipro** CLI and **libusb**, along with minipro's data files (`logicic.xml`, `infoic.xml`). Licence notices and the corresponding source archives live under `Contents/Resources/thirdparty/` (and in the repository’s `thirdparty/` folder) to satisfy GPLv3/LGPL requirements.
 
@@ -13,11 +13,11 @@ All builds bundle the open-source **minipro** CLI and **libusb**, along with min
 
 ### Linux
 
-Download the AppImage, then:
+Download the AppImage, then: (replace \<ver\> with real file version number)
 
 ```bash
-chmod +x FireMinipro-x86_64.AppImage
-./FireMinipro-x86_64.AppImage
+chmod +x FireMinipro-<ver>-x86_64.AppImage
+./FireMinipro-<ver>-x86_64.AppImage
 ```
 
 The AppImage is fully self-contained; it should run on a clean Ubuntu/Debian install with no additional packages.
