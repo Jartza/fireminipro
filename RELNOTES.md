@@ -1,8 +1,8 @@
 ## FireMinipro Release Notes
 
 **Packages provided**
-- `FireMinipro-macos-arm64.dmg` – Apple Silicon (macOS 12+)
-- `FireMinipro-macos-x86_64.dmg` – Intel (macOS 12+)
+- `fireminipro_arm64.dmg` – MacOs Apple Silicon (macOS 12+)
+- `fireminipro_intel.dmg` – MacOs Intel (macOS 12+)
 - `FireMinipro-x86_64.AppImage` – Linux (x86_64)
 
 All builds bundle the open-source **minipro 0.7.4** CLI and **libusb 1.0.29**, along with their data files (`logicic.xml`, `infoic.xml`). Licence notices and the corresponding source archives live under `Contents/Resources/thirdparty/` (and in the repository’s `thirdparty/` folder) to satisfy GPLv3/LGPL requirements.
