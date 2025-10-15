@@ -142,26 +142,25 @@ jobs:
           # Clean up
           rm -f linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
 
-      - name: Create release name
-        id: relname
+      - name: Determine release tag
+        id: release
         run: |
-          # If triggered by tag push, use tag (without v) as release name
-          # If manual dispatch, use branch name
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            rel="${GITHUB_REF#refs/tags/v}"
-          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            rel="${GITHUB_REF#refs/heads/}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+            if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+              git tag "$TAG_NAME"
+              git push origin "$TAG_NAME"
+            fi
           else
-            # fallback for PR or other triggers
-            rel="${VERSION}"
+            TAG_NAME="${GITHUB_REF_NAME}"
           fi
-          echo "RELEASE_NAME=$rel" >> $GITHUB_ENV
-          echo "Release name: $rel"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG_NAME"
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
-          tag_name: ${{ env.RELEASE_NAME }}
+          tag_name: ${{ steps.release.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
