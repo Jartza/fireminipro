@@ -133,9 +133,7 @@ On Linux:
 
 - Implement device `verify` option
 - Remove TEMP files that are created during runtime
-- Some UI refinements
 - Parsing the Logic IC test output, for now it's just printed to log
-- Make install package creation with CMake, or local install easier.
 
 ---
 
