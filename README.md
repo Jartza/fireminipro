@@ -19,6 +19,7 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 
 - **Buffer visualization:** Load multiple binary files at arbitrary offsets, visualize overlaps, and highlight padding.
 - **Flexible file operations:** Load, clear, merge, and save buffers of any size.
+- **Drag and Drop:** Files loaded to buffer can be reorganized by dragging, or you can drag files to the buffer from file explorer / finder.
 - **Device awareness:** Automatically detects connected Minipro programmers and supported device lists.
 - **Chip info:** Displays memory size, package and protocol details directly from Minipro.
 - **Device operations:** Blank check, erase, logic test, read, and write functions fully integrated.
@@ -29,11 +30,12 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 
 ## Releases
 
-AppImage for Linux and DMG for MacOs (12 and up) are provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
+If you do not feel comfortable building software yourself, there is
+**AppImage for Linux** and **DMG for MacOs** (12 and up) are provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
 
 ---
 
-## Prerequisites
+## Building prerequisites
 
 ### macOS
 Install dependencies using [Homebrew](https://brew.sh/):
