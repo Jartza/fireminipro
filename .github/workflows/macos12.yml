@@ -1,5 +1,5 @@
 # .github/workflows/macos12.yml
-name: macOS DMG OS12
+name: macOS DMG intel
 on:
   push:
     tags: ["v*"]
