@@ -33,9 +33,16 @@ jobs:
           mkdir -p dist
           cp -R build/fireminipro.app dist/
           arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_macos12.dmg
+      - name: Get latest tag (for manual trigger)
+        id: get_tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          latest_tag=$(git tag --sort=-creatordate | head -n 1)
+          echo "tag_name=$latest_tag" >> $GITHUB_OUTPUT
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: build/*.dmg
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && steps.get_tag.outputs.tag_name || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
