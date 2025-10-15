@@ -7,10 +7,10 @@
 
 ## Source archive
 
-Place the official source archive at:
+Source code has been made available at:
 
 ```
-thirdparty/minipro-0.7.4.tar.bz2
+https://github.com/Jartza/fireminipro/raw/refs/heads/main/thirdparty/minipro-0.7.4.tar.bz2
 ```
 
 This tarball is kept in the repository to satisfy the GPL requirement to
@@ -37,4 +37,4 @@ distribute the corresponding source alongside the binary.
 6. Include `LICENSE_minipro` and this README inside
    `Contents/Resources/thirdparty/minipro/`.
 
-These steps reproduce the bundled CLI that ships with FireMinipro.
+These steps reproduce the bundled CLI that ships with FireMinipro (AppImage and DMG)

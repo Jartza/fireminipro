@@ -6,10 +6,10 @@
 
 ## Source archive
 
-Place the official source archive at:
+Source code has been made available at:
 
 ```
-thirdparty/libusb-1.0.29.tar.bz2
+https://github.com/Jartza/fireminipro/raw/refs/heads/main/thirdparty/libusb-1.0.29.tar.bz2
 ```
 
 Keeping this tarball in the repository ensures the corresponding source is
@@ -50,4 +50,4 @@ available while distributing the binary, as required by the LGPL.
 5. Include `LICENSE_libusb` and this README inside
    `Contents/Resources/thirdparty/libusb/`.
 
-These steps reproduce the dylib that ships with FireMinipro.
+These steps reproduce the dylib that ships with FireMinipro (AppImage and DMG).
