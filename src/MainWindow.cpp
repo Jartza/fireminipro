@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QPlainTextEdit>
+#include <QScrollBar>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTableView>
@@ -38,6 +39,8 @@
 #include <QMessageBox>
 #include <QFontDatabase>
 #include <QSignalBlocker>
+#include <QTextCursor>
+#include <QEvent>
 #include <algorithm>
 #include <utility>
 
@@ -353,6 +356,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             this, &MainWindow::onLegendContextMenuRequested);
 
     log = new QPlainTextEdit(rightSplitter);
+    log->installEventFilter(this);
+    log->setAttribute(Qt::WA_StaticContents, true);
     log->setReadOnly(true);
     logFontDefault_ = log->font();
     logFontFixed_ = QFontDatabase::systemFont(QFontDatabase::FixedFont);
@@ -590,6 +595,12 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
                 edit->clear();
                 edit->setProperty("clearOnFirstClick", false);
             }
+        }
+    }
+
+    if (obj == log && e->type() == QEvent::Resize) {
+        if (auto *bar = log->verticalScrollBar()) {
+            bar->setValue(bar->maximum());
         }
     }
 
