@@ -1,5 +1,7 @@
 ## FireMinipro Release Notes
 
+Find releases from [here](https://github.com/Jartza/fireminipro/releases/)
+
 **Packages provided**
 - `fireminipro_arm64.dmg` – MacOs Apple Silicon (macOS 12+)
 - `fireminipro_intel.dmg` – MacOs Intel (macOS 12+)
