@@ -10,17 +10,18 @@ jobs:
     runs-on: Firebay-MacOS12
     env:
       MACOSX_DEPLOYMENT_TARGET: "12.0"
+      QT_HOME: "/Users/firebay/Qt/6.9.3/macos"
     steps:
       - uses: actions/checkout@v4
       - name: Configure & Build (x86_64)
         run: |
-          qt_prefix=$(/usr/local/bin/brew --prefix qt@6)
-          arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$qt_prefix" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          export PATH="$QT_HOME/bin:$PATH"
+          arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$QT_HOME" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           arch -x86_64 ninja -C build
       - name: Deploy Qt into .app bundle
         run: |
-          qt_prefix=$(/usr/local/bin/brew --prefix qt@6)
-          arch -x86_64 "$qt_prefix/bin/macdeployqt" build/fireminipro.app -verbose=2
+          export PATH="$QT_HOME/bin:$PATH"
+          arch -x86_64 "$QT_HOME/bin/macdeployqt" build/fireminipro.app -verbose=2
       - name: Ad-hoc sign app bundle
         run: |
           arch -x86_64 xattr -cr build/fireminipro.app
