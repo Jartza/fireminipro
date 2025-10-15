@@ -50,7 +50,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets DBus)
 
 set(SOURCES
     src/main.cpp
@@ -76,9 +76,7 @@ qt_add_executable(${PROJECT_NAME} MACOSX_BUNDLE
     resources/icons.qrc
 )
 
-target_compile_definitions(${PROJECT_NAME} PRIVATE QT_NO_DBUS)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
+target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets Qt6::DBus)
 # Expose PROJECT_VERSION to C++ as FIREMINIPRO_VERSION
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE FIREMINIPRO_VERSION="${FIREMINIPRO_VERSION_STRING}")
