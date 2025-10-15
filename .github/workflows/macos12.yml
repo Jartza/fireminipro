@@ -30,7 +30,7 @@ jobs:
         run: |
           mkdir -p dist
           cp -R build/fireminipro.app dist/
-          arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_macos12.dmg
+          arch -x86_64 hdiutil create -volname FireMinipro -srcfolder dist -ov -format UDZO build/fireminipro_intel.dmg
       - name: Get latest tag (for manual trigger)
         id: get_tag
         if: github.event_name == 'workflow_dispatch'
