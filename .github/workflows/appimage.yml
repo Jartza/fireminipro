@@ -1,4 +1,3 @@
-# .github/workflows/appimage.yml
 name: Linux AppImage
 on:
   push:
@@ -10,12 +9,18 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        # Ensures full git history for git describe
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
       - name: Install deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev patchelf \
             pkg-config libusb-1.0-0-dev zlib1g-dev \
             qt6-base-dev qt6-base-dev-tools qt6-tools-dev qt6-tools-dev-tools
+
       - name: Make Qt6 qmake discoverable
         run: |
           if [ -x /usr/lib/qt6/bin/qmake6 ]; then
@@ -25,10 +30,24 @@ jobs:
             sudo ln -sf /usr/lib/qt6/bin/qmake /usr/local/bin/qmake
           fi
           qmake -v || true
+
+      - name: Determine version
+        id: version
+        run: |
+          # Use git describe to get the version
+          ver=$(git describe --tags --always)
+          # Remove leading v if present
+          ver="${ver#v}"
+          # Remove hash at end (for tagged builds)
+          ver="${ver%%-g*}"
+          echo "VERSION=$ver" >> $GITHUB_ENV
+          echo "Determined version: $ver"
+
       - name: Build
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/qt6
           ninja -C build
+
       - name: Build minipro CLI
         env:
           MINIPRO_VERSION: 0.7.4
@@ -48,11 +67,13 @@ jobs:
           sed -i 's#rm -f $(SHARE_INSTDIR)#rm -f $(INSTALL_SHARE_INSTDIR)#' Makefile
           make PREFIX=/usr SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR=
           make PREFIX=/usr DESTDIR="$MINIPRO_STAGING" SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR= install
+
       - name: Fetch linuxdeploy tooling
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+
       - name: Bundle AppImage
         env:
           QMAKE: /usr/lib/qt6/bin/qmake6
@@ -61,6 +82,7 @@ jobs:
           LINUXDEPLOY_QT_AUTO_INCLUDE_MODULES: 1
           QT_SELECT: qt6
           APPIMAGE_EXTRACT_AND_RUN: 1
+          VERSION: ${{ env.VERSION }}
         run: |
           export PATH=/usr/lib/qt6/bin:$PATH
           export QMAKE=/usr/lib/qt6/bin/qmake6
@@ -104,16 +126,38 @@ jobs:
           if [ -f AppDir/usr/bin/minipro ]; then
             extra_flags+=(--executable AppDir/usr/bin/minipro)
           fi
+          # Build AppImage with correct versioned filename
           ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/fireminipro \
             -d AppDir/usr/share/applications/fireminipro.desktop \
             -i AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png \
             "${extra_flags[@]}" \
             --plugin qt --output appimage
+          # Rename the output file
+          mv FireMinipro*.AppImage "FireMinipro-${VERSION}-x86_64.AppImage"
           rm -f linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+
+      - name: Create release name
+        id: relname
+        run: |
+          # If triggered by tag push, use tag (without v) as release name
+          # If manual dispatch, use branch name
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            rel="${GITHUB_REF#refs/tags/v}"
+          elif [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            rel="${GITHUB_REF#refs/heads/}"
+          else
+            # fallback for PR or other triggers
+            rel="${VERSION}"
+          fi
+          echo "RELEASE_NAME=$rel" >> $GITHUB_ENV
+          echo "Release name: $rel"
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: ./*.AppImage
+          files: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
+          name: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
+          tag_name: ${{ env.RELEASE_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
