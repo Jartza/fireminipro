@@ -18,6 +18,15 @@ jobs:
           export PATH="$QT_HOME/bin:$PATH"
           arch -x86_64 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_PREFIX_PATH="$QT_HOME" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           arch -x86_64 ninja -C build
+      - name: Bundle minipro (x86_64)
+        run: |
+          DIST_DIR="/Users/firebay/github-runner/3rd_party/minipro-dist-x86_64"
+          mkdir -p build/fireminipro.app/Contents/MacOS
+          mkdir -p build/fireminipro.app/Contents/Frameworks
+          mkdir -p build/fireminipro.app/Contents/Resources
+          rsync -a "$DIST_DIR/MacOS/"       build/fireminipro.app/Contents/MacOS/
+          rsync -a "$DIST_DIR/Frameworks/"  build/fireminipro.app/Contents/Frameworks/
+          rsync -a "$DIST_DIR/Resources/"   build/fireminipro.app/Contents/Resources/
       - name: Deploy Qt into .app bundle
         run: |
           export PATH="$QT_HOME/bin:$PATH"
