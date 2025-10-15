@@ -4,7 +4,7 @@
 It is designed to be fast, intuitive, and lightweight — with special emphasis on **buffer management** and **visual clarity**.
 
 Unlike traditional programmer utilities, FireMinipro lets you view, merge, and manipulate binary data buffers easily before writing to or after reading from an EPROM, EEPROM, or logic IC.  
-It aims to provide a comfortable workflow for both hobbyists and professionals working with TL866, T48, T56, and compatible programmers.
+It aims to provide a comfortable workflow for both hobbyists and professionals working with TL866, T48 and compatible programmers.
 
 ---
 
@@ -24,6 +24,12 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 - **Device operations:** Blank check, erase, logic test, read, and write functions fully integrated.
 - **Progress tracking:** Live progress and operation status while reading or writing chips.
 - **Cross-platform support:** Works on both macOS and Linux using Qt6.
+
+---
+
+## Releases
+
+AppImage for Linux and DMG for MacOs (12 and up) are provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
 
 ---
 
@@ -136,20 +142,15 @@ On Linux:
 This project is released under the MIT License.  
 See [LICENSE](LICENSE) for details.
 
-### Third-party components
+### Third-party components & Acknowledgements
 
 FireMinipro bundles a few external utilities inside the macOS and Linux packages.  
 The corresponding source archives and licence texts live in [`thirdparty/`](thirdparty/):
 
-- **minipro 0.7.4** (GPLv3) by David Griffith – used to communicate with TL866/T48/T56 programmers.  
-- **libusb 1.0.29** (LGPL 2.1) – runtime dependency required by `minipro`.
+- **minipro** (GPLv3) by David Griffith – used to communicate with TL866/T48 programmers.  
+- **libusb** (LGPL 2.1) – runtime dependency required by `minipro`.
 
 The DMG/AppImage builds copy the relevant licences into `Resources/thirdparty/` so users
 always have access to the attribution and source information.
 
----
-
-## Acknowledgements
-
-FireMinipro builds upon the open-source **Minipro** utility by [David Griffith](https://gitlab.com/DavidGriffith/minipro)  
-and uses **Qt6** for its cross-platform GUI.
+**Qt6** is used as the cross-platform GUI framework.
