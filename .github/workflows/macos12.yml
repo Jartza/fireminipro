@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-          - name: Extract version from tag
+      - name: Extract version from tag
         id: get_version
         run: |
           RAW_TAG="${GITHUB_REF_NAME}"
