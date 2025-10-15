@@ -134,7 +134,12 @@ jobs:
             "${extra_flags[@]}" \
             --plugin qt --output appimage
           # Rename the output file
-          mv FireMinipro*.AppImage "FireMinipro-${VERSION}-x86_64.AppImage"
+          src=$(ls FireMinipro*.AppImage | head -n 1)
+          dst="FireMinipro-${VERSION}-x86_64.AppImage"
+          if [ "$src" != "$dst" ]; then
+            mv "$src" "$dst"
+          fi
+          # Clean up
           rm -f linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
 
       - name: Create release name
