@@ -36,7 +36,7 @@ jobs:
 
       - name: Bundle minipro + libusb (universal)
         run: |
-          DIST_DIR="/Users/firebay/github-runner/3rd_party/minipro-dist-univeral"
+          DIST_DIR="/Users/firebay/github-runner/3rd_party/minipro-dist-universal"
           mkdir -p build/fireminipro.app/Contents/MacOS
           mkdir -p build/fireminipro.app/Contents/Frameworks
           mkdir -p build/fireminipro.app/Contents/Resources
