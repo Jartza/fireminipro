@@ -3,8 +3,8 @@
 Find releases from [here](https://github.com/Jartza/fireminipro/releases/)
 
 **Packages provided**
-- `fireminipro_<ver>.dmg` – MacOs 12 and later, univeral binary
-- `FireMinipro-<ver>-x86_64.AppImage` – Linux (x86_64)
+- `fireminipro_<ver>.dmg` – MacOs 12 and later, univeral binary (Apple Silicon and Intel)
+- `FireMinipro-<ver>-x86_64.AppImage` – Linux AppImage (x86_64)
 
 All builds bundle the open-source **minipro** CLI and **libusb**, along with minipro's data files (`logicic.xml`, `infoic.xml`). Licence notices and the corresponding source archives live under `Contents/Resources/thirdparty/` (and in the repository’s `thirdparty/` folder) to satisfy GPLv3/LGPL requirements.
 
