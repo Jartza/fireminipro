@@ -1010,9 +1010,7 @@ void MainWindow::loadAtOffsetDialog(QString path) {
     for (QLabel* L : {lblOffInfo, lblLenInfo, lblEndInfo}) {
         L->setWordWrap(true);
         L->setTextFormat(Qt::RichText);   // allow <b> headings
-        QPalette pal = L->palette();
-        pal.setColor(QPalette::WindowText, Qt::black);
-        L->setPalette(pal);
+        L->setForegroundRole(QPalette::WindowText);
         infoLayout->addWidget(L);
     }
 
