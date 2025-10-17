@@ -376,24 +376,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hexModel = new HexView(this);
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
-    QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    const qreal basePoint = this->font().pointSizeF();
-    if (basePoint > 0.0) {
-        mono.setPointSizeF(std::max<qreal>(8.0, basePoint - 1.0));
-    } else if (this->font().pixelSize() > 0) {
-        const int pixelSize = this->font().pixelSize();
-        mono.setPixelSize(std::max(8, pixelSize - 2));
-    }
+    QFont mono;
+    mono.setFamily("Courier New");
+    mono.setStyleHint(QFont::TypeWriter);
+    mono.setPointSizeF(this->font().pointSizeF() - 1);
     tableHex->setFont(mono);
     tableHex->setWordWrap(false);
     tableHex->setAlternatingRowColors(true);
     tableHex->setSelectionBehavior(QAbstractItemView::SelectItems);
-    const QFontMetrics monoMetrics(mono);
-    const int rowHeight = monoMetrics.height() + 6;
-    auto *vh = tableHex->verticalHeader();
-    vh->setSectionResizeMode(QHeaderView::Fixed);
-    vh->setDefaultSectionSize(rowHeight);
-    vh->setMinimumSectionSize(rowHeight);
+    tableHex->verticalHeader()->setDefaultSectionSize(20);
 
     // Hexviewer header sizing
     auto *hh = tableHex->horizontalHeader();
@@ -404,8 +395,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 
     // set a compact width for all hex byte columns (1..bytesPerRow)
-    const int hexColumnWidth = std::max<int>(28, monoMetrics.horizontalAdvance(QStringLiteral("FF")) + 10);
-    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, hexColumnWidth);
+    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, 28);
+    tableHex->setAlternatingRowColors(true);
+    tableHex->verticalHeader()->setDefaultSectionSize(20);
     // ASCII column
     tableHex->horizontalHeader()->setStretchLastSection(true);
 
