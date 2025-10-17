@@ -144,23 +144,24 @@ jobs:
 
       - name: Determine release tag
         id: release
+        if: github.event_name != 'workflow_dispatch'
         run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            TAG_NAME="${GITHUB_REF_NAME}"
-            if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-              git tag "$TAG_NAME"
-              git push origin "$TAG_NAME"
-            fi
-          else
-            TAG_NAME="${GITHUB_REF_NAME}"
-          fi
+          TAG_NAME="${GITHUB_REF_NAME}"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Release tag: $TAG_NAME"
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
+        if: github.event_name != 'workflow_dispatch'
         with:
           files: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
           tag_name: ${{ steps.release.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: FireMinipro-${{ github.ref_name }}-${{ github.run_number }}
+          path: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
