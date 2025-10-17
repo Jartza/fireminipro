@@ -77,5 +77,5 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: fireminipro-${{ github.ref_name }}-${{ github.run_number }}
+          name: fireminipro-${{ steps.get_version.outputs.version }}-arm64
           path: build/fireminipro_*_arm64.dmg
