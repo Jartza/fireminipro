@@ -75,7 +75,7 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
         p.setPen(frameColor);
         p.drawRect(0, y, W-1, barH);
         p.setPen(textColor);
-        p.drawText(6, y+barH+16, QString::fromLatin1("(empty)"));
+        p.drawText(6, y+barH+16, tr("(empty)"));
         return;
     }
 
