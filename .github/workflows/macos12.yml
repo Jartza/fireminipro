@@ -60,23 +60,22 @@ jobs:
 
       - name: Set release tag name
         id: set_tag
-        if: github.event_name != 'workflow_dispatch'
         run: |
-          TAG_NAME="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            TAG_NAME="${GITHUB_REF_NAME}"
+            if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+              git tag "$TAG_NAME"
+              git push origin "$TAG_NAME"
+            fi
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
-        if: github.event_name != 'workflow_dispatch'
         with:
           files: build/fireminipro_*_x86_64.dmg
           tag_name: ${{ steps.set_tag.outputs.tag_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload build artifact
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: fireminipro-${{ steps.get_version.outputs.version }}-x86_64
-          path: build/fireminipro_*_x86_64.dmg
