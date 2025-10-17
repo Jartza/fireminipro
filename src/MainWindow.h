@@ -28,7 +28,7 @@ public:
 
 private slots:
     void saveBufferToFile();
-    void loadAtOffsetDialog(QString path = {});
+    void loadAtOffsetDialog(QString path = {}, bool deleteOnFinish = false);
     void loadFileAppendDialog();
     void onDevicesScanned(const QStringList &names);
     void onDevicesListed(const QStringList &names);
@@ -91,6 +91,7 @@ private:
     // In-memory buffer
     QByteArray buffer_;
     QString    lastPath_;
+    QString    pendingWriteTempPath_;
 
     // Buffer segment legend storage
     struct BufferSegment {

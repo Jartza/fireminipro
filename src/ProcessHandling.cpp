@@ -7,6 +7,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QDateTime>
+#include <QFile>
 
 // Constructor
 ProcessHandling::ProcessHandling(QObject *parent)
@@ -480,11 +481,13 @@ void ProcessHandling::handleFinished(int exitCode, QProcess::ExitStatus status) 
     // Logic chip test
     } else if (mode_ == Mode::Reading) {
         const bool ok = (status == QProcess::NormalExit && exitCode == 0);
-        // print debug info
+        const QString tempPath = pendingTempPath_;
+        pendingTempPath_.clear();
         if (ok) {
             mode_ = Mode::Idle;
-            emit readReady(pendingTempPath_);
+            emit readReady(tempPath);
         } else {
+            if (!tempPath.isEmpty()) QFile::remove(tempPath);
             mode_ = Mode::Idle;
             emit errorLine(QString("[Read error] exit=%1").arg(exitCode));
         }

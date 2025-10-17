@@ -41,6 +41,7 @@
 #include <QSignalBlocker>
 #include <QTextCursor>
 #include <QEvent>
+#include <QScopeGuard>
 #include <algorithm>
 #include <utility>
 
@@ -513,14 +514,15 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             if (log) log->appendPlainText("[Error] failed to create temp file for writing");
             return;
         }
+        pendingWriteTempPath_ = tempPath;
         // Write to target
         proc->writeChipImage(p, d, tempPath, optionFlags());
     });
 
     // Read from target is ready
     connect(proc, &ProcessHandling::readReady, this, [this](const QString& tempPath){
-        // Use the same dialog, but with a preselected path
-        loadAtOffsetDialog(tempPath);
+        // Use the same dialog, but with a preselected path, and remove temp afterwards
+        loadAtOffsetDialog(tempPath, true);
     });
 
     // Update the bar as progress arrives
@@ -550,6 +552,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
                 progReadWrite->setValue(100);
                 progReadWrite->setFormat(QStringLiteral("Idle"));
                 progReadWrite->setTextVisible(true);
+            }
+            if (!pendingWriteTempPath_.isEmpty()) {
+                QFile::remove(pendingWriteTempPath_);
+                pendingWriteTempPath_.clear();
             }
         });
 
@@ -797,6 +803,8 @@ QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
     }
     if (f.write(buffer_) != buffer_.size()) {
         if (log) log->appendPlainText("[Write] write temp failed.");
+        f.close();
+        f.remove();
         return {};
     }
     f.close();
@@ -939,9 +947,15 @@ void MainWindow::loadFileAppendDialog() {
     updateActionEnabling();
 }
 
-void MainWindow::loadAtOffsetDialog(QString path) {
+void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
     // Sanitary cursor
     QApplication::restoreOverrideCursor();
+
+    const auto cleanupTemp = qScopeGuard([&]{
+        if (deleteOnFinish && !path.isEmpty()) {
+            QFile::remove(path);
+        }
+    });
 
     // If preset path is given, skip the file picker dialog
     if (path.isEmpty()) {
@@ -957,7 +971,8 @@ void MainWindow::loadAtOffsetDialog(QString path) {
         if (path.isEmpty()) return;
     }
 #if !defined(Q_OS_MACOS)
-    lastPath_ = QFileInfo(path).absolutePath();
+    if (!deleteOnFinish)
+        lastPath_ = QFileInfo(path).absolutePath();
 #endif
 
     QFile f(path);
@@ -1132,7 +1147,8 @@ void MainWindow::loadAtOffsetDialog(QString path) {
         displayName += QString(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
     }
     addSegmentAndRefresh(off, effLen, displayName);
-    lastPath_ = QFileInfo(path).absolutePath();
+    if (!deleteOnFinish)
+        lastPath_ = QFileInfo(path).absolutePath();
 
     log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
                          .arg(QLocale().toString(effLen))
