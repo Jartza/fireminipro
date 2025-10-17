@@ -35,14 +35,18 @@
 #include <QStyleFactory>
 #include <QFileInfo>
 #include <QApplication>
+#include <QGuiApplication>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QFontDatabase>
 #include <QSignalBlocker>
 #include <QTextCursor>
 #include <QEvent>
+#include <QScreen>
+#include <QWindow>
 #include <algorithm>
 #include <utility>
+#include <cmath>
 
 #include "ProcessHandling.h"
 #include "MainWindow.h"
@@ -376,15 +380,54 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hexModel = new HexView(this);
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
-    QFont mono;
-    mono.setFamily("Courier New");
-    mono.setStyleHint(QFont::TypeWriter);
-    mono.setPointSizeF(this->font().pointSizeF() - 1);
+    QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    const qreal basePoint = this->font().pointSizeF();
+    if (basePoint > 0.0) {
+        mono.setPointSizeF(std::max<qreal>(8.0, basePoint - 1.0));
+    } else if (this->font().pixelSize() > 0) {
+        const int pixelSize = this->font().pixelSize();
+        mono.setPixelSize(std::max(8, pixelSize - 2));
+    }
     tableHex->setFont(mono);
     tableHex->setWordWrap(false);
     tableHex->setAlternatingRowColors(true);
     tableHex->setSelectionBehavior(QAbstractItemView::SelectItems);
-    tableHex->verticalHeader()->setDefaultSectionSize(20);
+    const QFontMetrics monoMetrics(mono);
+    auto alignForDevicePixels = [this](int logical) {
+        const QWindow *winHandle = this->windowHandle();
+        const QScreen *screen = winHandle ? winHandle->screen() : QGuiApplication::primaryScreen();
+        qreal scale = 1.0;
+        if (screen) {
+            scale = screen->devicePixelRatio();
+            if (scale <= 0.0) scale = 1.0;
+            if (std::abs(scale - 1.0) < 1e-3) {
+                const qreal logicalDpi = screen->logicalDotsPerInch();
+                if (logicalDpi > 0.0) {
+                    const qreal dpiScale = logicalDpi / 96.0;
+                    if (dpiScale > 1.01) scale = dpiScale;
+                }
+            }
+        }
+        int denom = 1;
+        constexpr int kMaxDenom = 8;
+        for (int candidate = 1; candidate <= kMaxDenom; ++candidate) {
+            const qreal scaled = scale * candidate;
+            if (std::abs(scaled - std::round(scaled)) < 1e-3) {
+                denom = candidate;
+                break;
+            }
+        }
+        if (denom > 1) {
+            const int remainder = logical % denom;
+            if (remainder != 0) logical += (denom - remainder);
+        }
+        return logical;
+    };
+    const int rowHeight = alignForDevicePixels(monoMetrics.height() + 6);
+    auto *vh = tableHex->verticalHeader();
+    vh->setSectionResizeMode(QHeaderView::Fixed);
+    vh->setDefaultSectionSize(rowHeight);
+    vh->setMinimumSectionSize(rowHeight);
 
     // Hexviewer header sizing
     auto *hh = tableHex->horizontalHeader();
@@ -395,11 +438,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
 
     // set a compact width for all hex byte columns (1..bytesPerRow)
-    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, 28);
-    tableHex->setAlternatingRowColors(true);
-    tableHex->verticalHeader()->setDefaultSectionSize(20);
-    // ASCII column
-    tableHex->horizontalHeader()->setStretchLastSection(true);
+    const int hexColumnWidth = alignForDevicePixels(
+        std::max<int>(28, monoMetrics.horizontalAdvance(QStringLiteral("FF")) + 10));
+    for (int c = 1; c <= hexModel->getBytesPerRow(); ++c) tableHex->setColumnWidth(c, hexColumnWidth);
 
     auto *split = new QSplitter(Qt::Horizontal, central);
     split->addWidget(leftBox);
