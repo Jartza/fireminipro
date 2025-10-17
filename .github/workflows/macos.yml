@@ -1,7 +1,7 @@
 name: macOS DMG Apple Silicon
 on:
-  push:
-    tags: ["v*"]
+  # push:
+  #   tags: ["v*"]
   workflow_dispatch:
 
 jobs:

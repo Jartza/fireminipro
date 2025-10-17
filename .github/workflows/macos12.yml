@@ -1,8 +1,8 @@
 # .github/workflows/macos12.yml
 name: macOS DMG intel
 on:
-  push:
-    tags: ["v*"]
+  # push:
+  #   tags: ["v*"]
   workflow_dispatch:
 
 jobs:
