@@ -121,8 +121,9 @@ On Linux:
 
 ## Notes
 
-- Current version is based on few days of work and might not yet be complete or even usable for all
-  purposes. Please report issues!
+- Current release is still on its' early days, might not yet be complete or even usable for all
+  purposes. Please report issues, send enhancement requests and tell about success-stories:
+  GitHub repo has both Issues and Discussions -tabs ready for use.
 - FireMinipro uses `minipro` under the hood, so your connected programmer must be supported by Minipro.
 - On macOS, the app includes a custom icon and can be bundled as a `.app` package for easier launching.
 - On Linux, the icon will appear in most desktop environments after installation (when packaged later).
@@ -132,8 +133,9 @@ On Linux:
 ## TODO
 
 - Implement device `verify` option
-- Remove TEMP files that are created during runtime
 - Parsing the Logic IC test output, for now it's just printed to log
+- More tools (split .bin file into chunks, byte-split Amiga rom binaries etc...)
+- AVR/PIC/GAL programming has not been tested or verified and needs future enhancements.
 
 ---
 
