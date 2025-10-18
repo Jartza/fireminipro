@@ -3,9 +3,10 @@
 #include <QPainter>
 #include <QPalette>
 #include <algorithm>
+#include <limits>
 
 LoadPreviewBar::LoadPreviewBar(QWidget *parent) : QWidget(parent) {
-    setMinimumHeight(88);
+    setMinimumHeight(120);
 }
 
 void LoadPreviewBar::setParams(qulonglong bufSize, qulonglong off, qulonglong dataLen, qulonglong padLen) {
@@ -17,7 +18,7 @@ void LoadPreviewBar::setParams(qulonglong bufSize, qulonglong off, qulonglong da
 }
 
 QSize LoadPreviewBar::sizeHint() const {
-    return QSize(420, 92);
+    return QSize(420, 120);
 }
 
 void LoadPreviewBar::paintEvent(QPaintEvent *event) {
@@ -62,7 +63,8 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
 
     const int W = width();
     const int barH = 16;
-    const int y = 8; // top margin
+    const int topMargin = 28;
+    const int y = topMargin; // bar top
 
     // Determine total span to visualize
     qulonglong total = bufSize_;
@@ -107,14 +109,16 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
     }
 
     bool hasOverlap = false;
+    qulonglong ovStart = 0;
+    qulonglong ovEnd = 0;
 
     // Overlap: portion of new data that overwrites existing buffer [0, bufSize_)
     if (dataLen_ > 0 && bufSize_ > 0) {
         const qulonglong dataStart = off_;
         const qulonglong dataEnd   = off_ + dataLen_;
         // True intersection of [dataStart, dataEnd) with [0, bufSize_)
-        const qulonglong ovStart = std::max<qulonglong>(dataStart, 0);
-        const qulonglong ovEnd   = std::min<qulonglong>(dataEnd,   bufSize_);
+        ovStart = std::max<qulonglong>(dataStart, 0);
+        ovEnd   = std::min<qulonglong>(dataEnd,   bufSize_);
         if (ovEnd > ovStart) {
             int xr0 = xFor(ovStart);
             int xr1 = xFor(ovEnd);
@@ -132,24 +136,211 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
         p.fillRect(x0, y, qMax(1, x1-x0), barH, paddingColor);
     }
 
-    // Simple tick labels
-    p.setPen(textColor);
-    QFont f = p.font(); f.setPointSizeF(f.pointSizeF()-1); p.setFont(f);
-    const QString startTxt = QString("0x") + QString::number(0,16).toUpper();
-    const QString offTxt   = QString("0x") + QString::number(off_,16).toUpper();
-    const QString endTxt   = QString("0x") + QString::number(total ? total-1 : 0,16).toUpper();
-    p.drawText(4, y+barH+14, startTxt);
-    // draw off only if meaningful and inside range
-    if (off_ > 0 && off_ < total) {
-        int xo = xFor(off_);
-        p.setPen(tickColor);
-        p.drawLine(xo, y+barH, xo, y+barH+4);
-        p.setPen(textColor);
-        p.drawText(qMin(qMax(4, xo-40), W-60), y+barH+14, offTxt);
-    }
-    p.drawText(W-4 - p.fontMetrics().horizontalAdvance(endTxt), y+barH+14, endTxt);
+    // Address markers: numbers above the bar + legend below
+    struct AddressMarker {
+        qulonglong value = 0;
+        int x = 0;
+        QString text;
+        bool top = true;
+        int textX = 0;
+    };
+    const int edgeMargin = 2;
+    const int tickLength = 7;
+    QVector<AddressMarker> markers;
+    const int leftEdge = 0;
+    const int rightEdge = W - 1;
 
-    int ly = y + barH + 30;
+    auto addMarker = [&](qulonglong value) {
+        if (total == 0) return;
+        if (value > total) value = total;
+        if (value > 0 && value == total) value = total - 1;
+        if (qint64(value) < 0) value = 0;
+        AddressMarker marker;
+        marker.value = value;
+        if (value == 0) {
+            marker.x = leftEdge;
+        } else if (value == total - 1) {
+            marker.x = rightEdge;
+        } else {
+            marker.x = std::clamp(xFor(value), leftEdge, rightEdge);
+        }
+        marker.text = QStringLiteral("0x") + QString::number(value, 16).toUpper();
+        markers.append(std::move(marker));
+    };
+
+    addMarker(0);
+    if (bufSize_ > 0) addMarker(bufSize_ - 1);
+    if (prePadLen > 0 && off_ > 0) addMarker(off_ - 1);
+    if (dataLen_ > 0) {
+        addMarker(off_);
+        addMarker(off_ + dataLen_ - 1);
+    }
+    if (ovEnd > ovStart) {
+        addMarker(ovStart);
+        addMarker(ovEnd - 1);
+    }
+    if (padLen_ > 0) {
+        addMarker(off_ + dataLen_);
+        addMarker(off_ + dataLen_ + padLen_ - 1);
+    }
+    if (total > 0) addMarker(total - 1);
+
+    std::sort(markers.begin(), markers.end(), [](const AddressMarker &a, const AddressMarker &b) {
+        if (a.value == b.value) return a.x < b.x;
+        return a.value < b.value;
+    });
+    QVector<AddressMarker> deduped;
+    deduped.reserve(markers.size());
+    int lastX = -1;
+    qulonglong lastValue = std::numeric_limits<qulonglong>::max();
+    for (const auto &marker : markers) {
+        if (!deduped.isEmpty() && marker.value == lastValue) continue;
+        if (!deduped.isEmpty() && std::abs(marker.x - lastX) <= 1) continue;
+        deduped.append(marker);
+        lastValue = marker.value;
+        lastX = marker.x;
+    }
+    markers = deduped;
+
+    QFont markerFont = p.font();
+    markerFont.setBold(false);
+    markerFont.setPointSizeF(markerFont.pointSizeF() - 1.5);
+    p.setFont(markerFont);
+    const QFontMetrics markerMetrics(markerFont);
+    const int topBaseline = y - tickLength - 2;
+    const int bottomTextTop = y + barH + tickLength + 2;
+    const int bottomBaseline = bottomTextTop + markerMetrics.ascent();
+
+    const int overlapGap = 2;
+    int lastTopRight = edgeMargin - overlapGap - 3;
+    int lastBottomRight = edgeMargin - overlapGap - 3;
+    for (int i = 0; i < markers.size(); ++i) {
+        const QString number = QString::number(i + 1);
+        const int textWidth = markerMetrics.horizontalAdvance(number);
+        const int anchor = markers[i].x;
+
+        int topTextX = anchor - textWidth / 2;
+        if (i == 0) {
+            topTextX = std::max(edgeMargin, anchor - textWidth + 1);
+        } else {
+            if (topTextX < edgeMargin) topTextX = edgeMargin;
+        }
+        if (topTextX + textWidth > W - edgeMargin) topTextX = W - edgeMargin - textWidth;
+        bool topOverlap = (topTextX <= lastTopRight + overlapGap);
+
+        int bottomTextX = anchor - textWidth / 2;
+        if (bottomTextX + textWidth > W - edgeMargin) bottomTextX = W - edgeMargin - textWidth;
+        if (i == markers.size() - 1) {
+            bottomTextX = std::min(W - edgeMargin - textWidth, anchor - 1);
+        }
+        if (bottomTextX < edgeMargin) bottomTextX = edgeMargin;
+        bool bottomOverlap = (bottomTextX <= lastBottomRight + overlapGap);
+
+        bool placeTop = true;
+        if (topOverlap && !bottomOverlap) placeTop = false;
+        else if (!topOverlap && bottomOverlap) placeTop = true;
+        else if (topOverlap && bottomOverlap) {
+            int spaceTop = topTextX - edgeMargin;
+            int spaceBottom = (W - edgeMargin) - (bottomTextX + textWidth);
+            placeTop = spaceTop >= spaceBottom;
+        }
+
+        markers[i].top = placeTop;
+        if (placeTop) {
+            if (topTextX <= lastTopRight + overlapGap) {
+                topTextX = lastTopRight + overlapGap + 1;
+                if (topTextX + textWidth > W - edgeMargin) {
+                    topTextX = W - edgeMargin - textWidth;
+                }
+            }
+            markers[i].textX = topTextX;
+            lastTopRight = topTextX + textWidth;
+        } else {
+            if (bottomTextX <= lastBottomRight + overlapGap) {
+                bottomTextX = lastBottomRight + overlapGap + 1;
+                if (bottomTextX + textWidth > W - edgeMargin) {
+                    bottomTextX = W - edgeMargin - textWidth;
+                }
+                if (bottomTextX < edgeMargin) bottomTextX = edgeMargin;
+            }
+            markers[i].textX = bottomTextX;
+            lastBottomRight = bottomTextX + textWidth;
+        }
+    }
+
+    p.setPen(tickColor);
+    for (int i = 0; i < markers.size(); ++i) {
+        const QString number = QString::number(i + 1);
+        const int anchor = markers[i].x;
+        if (markers[i].top) {
+            p.drawLine(anchor, y, anchor, y - tickLength);
+            p.setPen(textColor);
+            p.drawText(markers[i].textX, topBaseline, number);
+            p.setPen(tickColor);
+        } else {
+            p.drawLine(anchor, y + barH, anchor, y + barH + tickLength);
+            p.setPen(textColor);
+            p.drawText(markers[i].textX, bottomBaseline, number);
+            p.setPen(tickColor);
+        }
+    }
+
+    p.setFont(markerFont);
+    const int markerBlockHeight = markerMetrics.height() + tickLength + 4;
+    const int legendTop = y + barH + markerBlockHeight + 4;
+
+    p.setBrush(Qt::NoBrush);
+    QFont legendFont = p.font();
+    legendFont.setBold(false);
+    legendFont.setPointSizeF(legendFont.pointSizeF() - 1);
+    p.setFont(legendFont);
+    const QFontMetrics legendMetrics(legendFont);
+    int addrLy = legendTop + legendMetrics.ascent();
+    int addrLx = 4;
+    const QString bufferLabel = tr("buffer");
+    const QString dataLabel = tr("data");
+    const QString paddingLabel = tr("padding");
+    const QString overlapLabel = tr("overlap");
+    const bool hasBufferSegment = bufSize_ > 0;
+    bool hasDataSegment = false;
+    if (dataLen_ > 0) {
+        const qulonglong dataStart = off_;
+        const qulonglong dataEnd = off_ + dataLen_;
+        qulonglong overlapLen = 0;
+        if (ovEnd > ovStart) {
+            const qulonglong overlapStart = std::max(ovStart, dataStart);
+            const qulonglong overlapEnd = std::min(ovEnd, dataEnd);
+            if (overlapEnd > overlapStart) overlapLen = overlapEnd - overlapStart;
+        }
+        hasDataSegment = dataLen_ > overlapLen;
+    }
+    const bool hasPaddingSegment = (prePadLen > 0) || (padLen_ > 0);
+    QStringList activeFields;
+    if (hasBufferSegment) activeFields << bufferLabel;
+    if (hasDataSegment) activeFields << dataLabel;
+    if (hasPaddingSegment) activeFields << paddingLabel;
+    if (hasOverlap) activeFields << overlapLabel;
+
+    QFont legendBold = legendFont;
+    legendBold.setBold(true);
+
+    for (int i = 0; i < markers.size(); ++i) {
+        const QString numberLabel = QString::number(i + 1);
+        const QString addressText = markers[i].text;
+        const QString suffix = QStringLiteral(": %1").arg(addressText);
+        const int numberWidth = legendMetrics.horizontalAdvance(numberLabel);
+        const int suffixWidth = legendMetrics.horizontalAdvance(suffix);
+
+        p.setPen(textColor);
+        p.setFont(legendBold);
+        p.drawText(addrLx, addrLy, numberLabel);
+        p.setFont(legendFont);
+        p.drawText(addrLx + numberWidth, addrLy, suffix);
+
+        addrLx += numberWidth + suffixWidth + 16;
+    }
+
+    int ly = addrLy + legendMetrics.height() + 8;
     auto legend = [&](QColor c, const QString &t, int &lx){
         p.fillRect(lx, ly-10, 10, 10, c);
         p.setPen(frameColor);
@@ -158,13 +349,11 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
         p.drawText(lx+14, ly, t);
         lx += 14 + p.fontMetrics().horizontalAdvance(t) + 12;
     };
-    const bool hasBuffer  = (bufSize_ > 0);
-    // dataLen_ is the file portion (green) that will be written
-    const bool hasData    = (dataLen_ > 0);
-    const bool hasPadding = (prePadLen > 0) || (padLen_ > 0);
     int lx = 4;
-    if (hasBuffer)  legend(bufferColor, tr("buffer"),  lx);
-    if (hasData)    legend(dataColor,   tr("data"),    lx);
-    if (hasPadding) legend(paddingColor,tr("padding"), lx);
-    if (hasOverlap) legend(overlapColor,tr("overlap"), lx);
+    for (const QString &label : activeFields) {
+        if (label == bufferLabel) legend(bufferColor, label, lx);
+        else if (label == dataLabel) legend(dataColor, label, lx);
+        else if (label == paddingLabel) legend(paddingColor, label, lx);
+        else if (label == overlapLabel) legend(overlapColor, label, lx);
+    }
 }
