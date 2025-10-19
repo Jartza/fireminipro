@@ -38,6 +38,9 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QFontDatabase>
+#include <QPair>
+#include <algorithm>
+#include <utility>
 #include <QSignalBlocker>
 #include <QTextCursor>
 #include <QEvent>
@@ -1098,6 +1101,19 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         const qulonglong postPad  = (haveLen && lenReq > fileSize) ? (lenReq - fileSize) : 0;
         const bool prePadNeeded = offOk && (off > static_cast<qulonglong>(buffer_.size()));
         editPad->setEnabled(postPad > 0 || prePadNeeded);
+
+        QVector<QPair<qulonglong, qulonglong>> previewSegments;
+        if (!bufferSegments.isEmpty()) {
+            previewSegments.reserve(bufferSegments.size());
+            for (const auto &seg : std::as_const(bufferSegments)) {
+                if (seg.length == 0) continue;
+                previewSegments.append({seg.start, seg.length});
+            }
+            std::sort(previewSegments.begin(), previewSegments.end(),
+                      [](const QPair<qulonglong, qulonglong> &a,
+                         const QPair<qulonglong, qulonglong> &b) { return a.first < b.first; });
+        }
+        preview->setBufferSegments(std::move(previewSegments));
         preview->setParams(static_cast<qulonglong>(buffer_.size()), offOk ? off : 0, filePart, postPad);
         okBtn->setEnabled(offOk && (effLen > 0) && padOk);
     };

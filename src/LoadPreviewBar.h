@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QPair>
+#include <QVector>
 #include <QWidget>
 
 // Visualizes how a file will be merged into the current buffer.
@@ -8,6 +10,7 @@ public:
     explicit LoadPreviewBar(QWidget *parent = nullptr);
 
     void setParams(qulonglong bufSize, qulonglong off, qulonglong dataLen, qulonglong padLen);
+    void setBufferSegments(QVector<QPair<qulonglong, qulonglong>> segments);
 
 protected:
     QSize sizeHint() const override;
@@ -18,4 +21,5 @@ private:
     qulonglong off_{};
     qulonglong dataLen_{};
     qulonglong padLen_{};
+    QVector<QPair<qulonglong, qulonglong>> bufferSegments_;
 };

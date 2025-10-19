@@ -3,7 +3,9 @@
 #include <QPainter>
 #include <QPalette>
 #include <algorithm>
+#include <cstdlib>
 #include <limits>
+#include <utility>
 
 LoadPreviewBar::LoadPreviewBar(QWidget *parent) : QWidget(parent) {
     setMinimumHeight(120);
@@ -14,6 +16,11 @@ void LoadPreviewBar::setParams(qulonglong bufSize, qulonglong off, qulonglong da
     off_ = off;
     dataLen_ = dataLen;
     padLen_ = padLen;
+    update();
+}
+
+void LoadPreviewBar::setBufferSegments(QVector<QPair<qulonglong, qulonglong>> segments) {
+    bufferSegments_ = std::move(segments);
     update();
 }
 
@@ -134,6 +141,24 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
         int x0 = xFor(qMin(off_ + dataLen_, total));
         int x1 = xFor(qMin(off_ + dataLen_ + padLen_, total));
         p.fillRect(x0, y, qMax(1, x1-x0), barH, paddingColor);
+    }
+
+    // Existing buffer segments markers (thin vertical lines at each start, except first)
+    if (bufferSegments_.size() > 1) {
+        const int lineTop = y + 1;
+        const int lineBottom = y + barH - 2;
+        QColor markerColor = frameColor;
+        markerColor.setAlpha(180);
+        QPen segmentPen(markerColor, 1);
+        p.setPen(segmentPen);
+        for (int i = 1; i < bufferSegments_.size(); ++i) {
+            const auto &segment = bufferSegments_.at(i);
+            qulonglong segStart = segment.first;
+            if (segStart >= total) continue;
+            int x = xFor(segStart);
+            p.drawLine(x, lineTop, x, lineBottom);
+        }
+        p.setPen(frameColor);
     }
 
     // Address markers: numbers above the bar + legend below
@@ -323,12 +348,13 @@ void LoadPreviewBar::paintEvent(QPaintEvent *event) {
 
     QFont legendBold = legendFont;
     legendBold.setBold(true);
+    const QFontMetrics numberMetrics(legendBold);
 
     for (int i = 0; i < markers.size(); ++i) {
         const QString numberLabel = QString::number(i + 1);
         const QString addressText = markers[i].text;
         const QString suffix = QStringLiteral(": %1").arg(addressText);
-        const int numberWidth = legendMetrics.horizontalAdvance(numberLabel);
+        const int numberWidth = numberMetrics.horizontalAdvance(numberLabel);
         const int suffixWidth = legendMetrics.horizontalAdvance(suffix);
 
         p.setPen(textColor);
