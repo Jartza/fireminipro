@@ -153,6 +153,5 @@ The corresponding source archives and licence texts live in [`thirdparty/`](thir
 - **libusb** (LGPL 2.1) – runtime dependency required by `minipro`.
 
 The DMG/AppImage builds copy the relevant licences into `Resources/thirdparty/` so users
-always have access to the attribution and source information.
-
-**Qt6** is used as the cross-platform GUI framework.
+always have access to the attribution and source information. Details about the Qt 6
+modules and their LGPL requirements are documented in [`thirdparty/README_qt.md`](thirdparty/README_qt.md).
