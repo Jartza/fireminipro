@@ -151,6 +151,7 @@ The corresponding source archives and licence texts live in [`thirdparty/`](thir
 
 - **minipro** (GPLv3) by David Griffith – used to communicate with TL866/T48 programmers.  
 - **libusb** (LGPL 2.1) – runtime dependency required by `minipro`.
+- **Qt 6** (LGPLv3) – cross-platform GUI framework used by FireMinipro. See [`thirdparty/README_qt.md`](thirdparty/README_qt.md) and the bundled [`thirdparty/LICENSE_qt6`](thirdparty/LICENSE_qt6).
 
 The DMG/AppImage builds copy the relevant licences into `Resources/thirdparty/` so users
 always have access to the attribution and source information. Details about the Qt 6

@@ -114,6 +114,10 @@ jobs:
               cp -R "$MINIPRO_STAGING/share/licenses" AppDir/usr/share/licenses/
             fi
           fi
+          mkdir -p AppDir/usr/share/doc/fireminipro/thirdparty
+          cp thirdparty/LICENSE_* AppDir/usr/share/doc/fireminipro/thirdparty/
+          cp thirdparty/README_*.md AppDir/usr/share/doc/fireminipro/thirdparty/
+          cp thirdparty/*.tar.bz2 AppDir/usr/share/doc/fireminipro/thirdparty/
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \

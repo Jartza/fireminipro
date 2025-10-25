@@ -10,7 +10,8 @@
 The modules above fall under the GNU Lesser General Public License v3 (LGPLv3). FireMinipro
 fulfils the relevant terms as follows:
 
-- The DMG/AppImage bundles already ship the LGPLv3 text in `Resources/thirdparty/`.
+- The DMG/AppImage bundles already ship the LGPLv3 text in `Resources/thirdparty/`
+  (see [`LICENSE_qt6`](LICENSE_qt6)).
 - Release notes and packaging metadata record the exact Qt version used. Users can
   fetch the matching sources from https://download.qt.io/official_releases/. If a
   future release needs patched Qt sources, those patches must be mirrored here as well.
