@@ -51,6 +51,7 @@
 #include "ProcessHandling.h"
 #include "MainWindow.h"
 #include "HexView.h"
+#include "HexTableView.h"
 #include "LoadPreviewBar.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
@@ -325,7 +326,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // right side (hex + legend + log)
     auto *rightSplitter = new QSplitter(Qt::Vertical, central);
-    tableHex = new QTableView(rightSplitter);
+    tableHex = new HexTableView(rightSplitter);
 
     // Buffer legend table
     legendTable = new SegmentTableView(rightSplitter);
@@ -380,12 +381,39 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     hexModel = new HexView(this);
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
+
+    // Set up monospace font for hex view
+    QStringList preferredFonts = {
+        "Courier New",
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Monospace",
+        "Consolas",
+        "Menlo"
+    };
+
+    QString chosenFamily;
+    const QStringList availableFamilies = QFontDatabase::families();
+    for (const QString &family : preferredFonts) {
+        if (availableFamilies.contains(family)) {
+            chosenFamily = family;
+            break;
+        }
+    }
+
     QFont mono;
-    mono.setFamily("Courier New");
-    mono.setStyleHint(QFont::TypeWriter);
+    if (chosenFamily.isEmpty()) {
+        // Fallback to system fixed font
+        mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    } else {
+        mono.setFamily(chosenFamily);
+        mono.setStyleHint(QFont::TypeWriter);
+    }
+
     mono.setPointSizeF(this->font().pointSizeF() - 1);
     tableHex->setFont(mono);
     tableHex->setWordWrap(false);
+    hexModel->setHexFont(mono);  // Pass the same font to the model
     tableHex->setAlternatingRowColors(true);
     tableHex->setSelectionBehavior(QAbstractItemView::SelectItems);
     tableHex->verticalHeader()->setDefaultSectionSize(20);

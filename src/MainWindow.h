@@ -9,7 +9,7 @@
 
 class QComboBox;
 class QPushButton;
-class QTableView;
+class HexTableView;
 class QPlainTextEdit;
 class QCheckBox;
 class QLabel;
@@ -77,7 +77,7 @@ private:
     QCheckBox *chkNoSizeErr{};
 
     // Views
-    QTableView     *tableHex{};
+    HexTableView   *tableHex{};
     QPlainTextEdit *log{};
     QFont logFontDefault_;
     QFont logFontFixed_;
