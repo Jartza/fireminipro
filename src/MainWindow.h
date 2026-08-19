@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QStringList>
 #include <QUrl>
+#include <QSplitter>
 #include "ProcessHandling.h"
 
 class QComboBox;
@@ -135,7 +136,11 @@ private:
     void ensureBufferSize(int newSize, char padByte);
     void patchBuffer(int offset, const QByteArray &data, char padByte);
 
+    QSplitter *mainSplitter;      // Horizontal splitter
+    QSplitter *rightSplitter;     // Vertical splitter
+
 protected:
       bool eventFilter(QObject *obj, QEvent *event) override;
+      void closeEvent(QCloseEvent *event) override;
 
 };

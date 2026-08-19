@@ -45,6 +45,8 @@
 #include <QTextCursor>
 #include <QEvent>
 #include <QScopeGuard>
+#include <QSettings>
+#include <QCloseEvent>
 #include <algorithm>
 #include <utility>
 
@@ -63,6 +65,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setCentralWidget(central);
     setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool " FIREMINIPRO_VERSION);
     this->setMinimumSize(1050,768);
+    // Restore window geometry
+    QSettings settings;
+    const QByteArray geometry = settings.value("mainWindow/geometry").toByteArray();
+    if (!geometry.isEmpty()) {
+        restoreGeometry(geometry);
+    }
 
     // Menu bar
     auto *mb = menuBar();
@@ -325,7 +333,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addStretch();
 
     // right side (hex + legend + log)
-    auto *rightSplitter = new QSplitter(Qt::Vertical, central);
+    rightSplitter = new QSplitter(Qt::Vertical, central);
     tableHex = new HexTableView(rightSplitter);
 
     // Buffer legend table
@@ -376,6 +384,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     rightSplitter->setStretchFactor(0, 5);
     rightSplitter->setStretchFactor(1, 1);
     rightSplitter->setStretchFactor(2, 3);
+
+    const QByteArray rightSplitterState = settings.value("mainWindow/rightSplitterState").toByteArray();
+    if (!rightSplitterState.isEmpty()) {
+        rightSplitter->restoreState(rightSplitterState);
+    }
 
     // Hex view/model
     hexModel = new HexView(this);
@@ -433,14 +446,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // ASCII column
     tableHex->horizontalHeader()->setStretchLastSection(true);
 
-    auto *split = new QSplitter(Qt::Horizontal, central);
-    split->addWidget(leftBox);
-    split->addWidget(rightSplitter);
-    split->setStretchFactor(0, 0);
-    split->setStretchFactor(1, 1);
-
+    mainSplitter = new QSplitter(Qt::Horizontal, central);
+    mainSplitter->addWidget(leftBox);
+    mainSplitter->addWidget(rightSplitter);
+    mainSplitter->setStretchFactor(0, 0);
+    mainSplitter->setStretchFactor(1, 1);
+    //QSettings settings;
+    const QByteArray mainSplitterState = settings.value("mainWindow/mainSplitterState").toByteArray();
+    if (!mainSplitterState.isEmpty()) {
+        mainSplitter->restoreState(mainSplitterState);
+    }
     auto *rootLayout = new QVBoxLayout(central);
-    rootLayout->addWidget(split);
+    rootLayout->addWidget(mainSplitter);
 
     // button wiring
     connect(btnClear, &QPushButton::clicked, this, [this]{
@@ -1525,4 +1542,21 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
 
     bufferSegments = std::move(coalesced);
     updateLegendTable();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    QSettings settings;
+
+    // Save window geometry
+    settings.setValue("mainWindow/geometry", saveGeometry());
+
+    // Save splitter states
+    if (mainSplitter) {
+        settings.setValue("mainWindow/mainSplitterState", mainSplitter->saveState());
+    }
+    if (rightSplitter) {
+        settings.setValue("mainWindow/rightSplitterState", rightSplitter->saveState());
+    }
+
+    QMainWindow::closeEvent(event);
 }
