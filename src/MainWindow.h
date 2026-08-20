@@ -13,6 +13,7 @@ class QPushButton;
 class HexTableView;
 class QPlainTextEdit;
 class QCheckBox;
+class QGroupBox;
 class QLabel;
 class QWidget;
 class HexView;
@@ -47,14 +48,24 @@ private:
     QComboBox   *comboDevice{};
     QPushButton *btnRescan{};
 
-    // Chip information
+    // Chip information - Memory
     QLabel      *chipName{};
     QLabel      *chipPackage{};
     QLabel      *chipMemory{};
     QLabel      *chipBusWidth{};
     QLabel      *chipProtocol{};
-    QLabel      *chipReadBuf{};
-    QLabel      *chipWriteBuf{};
+    QLabel      *chipVCC{};
+    QLabel      *chipVPP{};
+
+    // Chip information - Logic
+    QLabel      *logicName{};
+    QLabel      *logicPackage{};
+    QLabel      *logicVectors{};
+    QLabel      *logicVCC{};
+
+    // Info groups
+    QGroupBox *memoryInfoGroup_{};
+    QGroupBox *logicInfoGroup_{};
 
     // Buffer group
     QPushButton *btnClear{};
@@ -67,11 +78,13 @@ private:
     QLabel      *lblBufSize{};
 
     // Device operations
+    QGroupBox   *groupDevOps{};
     QPushButton *btnBlankCheck{};
     QPushButton *btnEraseDevice{};
     QPushButton *btnTestLogic{};
 
     // Device options
+    QGroupBox *groupOpts{};
     QCheckBox *chkSkipVerify{};
     QCheckBox *chkIgnoreId{};
     QCheckBox *chkSkipId{};
