@@ -46,6 +46,8 @@ public:
         QString raw;           // full captured text for debugging
         bool    isLogic{};     // true if logic chip, false if eeprom/flash
         int     vectorCount{}; // for logic chips, number of vectors
+        QString vcc;           // VCC voltage
+        QString vpp;           // VPP voltage
     };
 
 signals:

@@ -45,12 +45,15 @@
 #include <QTextCursor>
 #include <QEvent>
 #include <QScopeGuard>
+#include <QSettings>
+#include <QCloseEvent>
 #include <algorithm>
 #include <utility>
 
 #include "ProcessHandling.h"
 #include "MainWindow.h"
 #include "HexView.h"
+#include "HexTableView.h"
 #include "LoadPreviewBar.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
@@ -61,7 +64,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *central = new QWidget(this);
     setCentralWidget(central);
     setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool " FIREMINIPRO_VERSION);
-    this->setMinimumSize(1050,768);
+    this->setMinimumSize(1240,640); // fit on old HD ready laptop sreen (1280x720)
+    // Restore window geometry
+    QSettings settings;
+    const QByteArray geometry = settings.value("mainWindow/geometry").toByteArray();
+    if (!geometry.isEmpty()) {
+        restoreGeometry(geometry);
+    }
 
     // Menu bar
     auto *mb = menuBar();
@@ -104,7 +113,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *leftLayout = new QVBoxLayout(leftBox);
 
     // Target group
-    auto *groupTargets = new QGroupBox("Target", leftBox);
+    auto *groupTargets = new QGroupBox(leftBox);
     auto *gridT = new QGridLayout(groupTargets);
     auto *lblProg = new QLabel("Programmer:", groupTargets);
     auto *lblDev  = new QLabel("Device:",     groupTargets);
@@ -134,7 +143,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboProgrammer->setPlaceholderText("No programmer");
     comboDevice->setPlaceholderText("No devices");
     groupTargets->setLayout(gridT);
-    leftLayout->addWidget(groupTargets);
+    leftLayout->addWidget(groupTargets, 0);
 
     // Make device combobox searchable / filterable
     // and editable to allow custom device names,
@@ -217,6 +226,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             if (t.isEmpty()) {
                 QSignalBlocker block(comboDevice);
                 comboDevice->setCurrentIndex(-1);
+                clearChipInfo();
                 updateActionEnabling();
             }
         });
@@ -226,43 +236,71 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
     // Chip information (between Target and Buffer)
-    auto *groupChipInfo = new QGroupBox("Chip information", leftBox);
-    auto *gridC = new QGridLayout(groupChipInfo);
+    // Memory chip information box
+    auto *groupMemInfo = new QGroupBox(leftBox);
+    auto *gridMemC = new QGridLayout(groupMemInfo);
 
-    // left column (keys), right column (values)
-    auto addRow = [&](int r, const char *key, QLabel *&valueOut) {
-        auto *k = new QLabel(QString::fromUtf8(key), groupChipInfo);
+    // Logic chip information box
+    auto *groupLogicInfo = new QGroupBox(leftBox);
+    auto *gridLogicC = new QGridLayout(groupLogicInfo);
+
+    // Generic row adder - works for both memory and logic boxes
+    auto addInfoRow = [&small](QGridLayout *grid, QWidget *parent, int r,
+                                  const char *key, QLabel *&valueOut) {
+        auto *k = new QLabel(QString::fromUtf8(key), parent);
         k->setFont(small);
         k->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        valueOut = new QLabel("-", groupChipInfo);
+        valueOut = new QLabel("-", parent);
         valueOut->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        gridC->addWidget(k, r, 0);
-        gridC->addWidget(valueOut, r, 1);
+        grid->addWidget(k, r, 0);
+        grid->addWidget(valueOut, r, 1);
     };
 
-    // rows
-    int r = 0;
-    addRow(r++, "Name:",           chipName);
-    addRow(r++, "Package:",        chipPackage);
-    addRow(r++, "Memory:",         chipMemory);
-    addRow(r++, "Mem width:",      chipBusWidth);
-    addRow(r++, "Protocol:",       chipProtocol);
+    // Memory rows
+    int mr = 0;
+    addInfoRow(gridMemC, groupMemInfo, mr++, "Name:",           chipName);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "Package:",        chipPackage);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "Memory:",         chipMemory);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "Mem width:",      chipBusWidth);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "Protocol:",       chipProtocol);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "VCC:",            chipVCC);
+    addInfoRow(gridMemC, groupMemInfo, mr++, "VPP:",            chipVPP);
 
-    gridC->setColumnStretch(0, 0);
-    gridC->setColumnStretch(1, 1);
-    groupChipInfo->setLayout(gridC);
-    leftLayout->addWidget(groupChipInfo);
+    gridMemC->setColumnStretch(0, 0);
+    gridMemC->setColumnStretch(1, 1);
+    groupMemInfo->setLayout(gridMemC);
+    leftLayout->addWidget(groupMemInfo, 0);
+
+    // Logic rows
+    int lr = 0;
+    addInfoRow(gridLogicC, groupLogicInfo, lr++, "Name:",           logicName);
+    addInfoRow(gridLogicC, groupLogicInfo, lr++, "Package:",        logicPackage);
+    addInfoRow(gridLogicC, groupLogicInfo, lr++, "VCC:",            logicVCC);
+    addInfoRow(gridLogicC, groupLogicInfo, lr++, "Vector count:",   logicVectors);
+
+    gridLogicC->setColumnStretch(0, 0);
+    gridLogicC->setColumnStretch(1, 1);
+    groupLogicInfo->setLayout(gridLogicC);
+    leftLayout->addWidget(groupLogicInfo, 0);
+
+    // Store pointers and hide both initially
+    memoryInfoGroup_ = groupMemInfo;
+    logicInfoGroup_ = groupLogicInfo;
+    memoryInfoGroup_->setVisible(false);
+    logicInfoGroup_->setVisible(false);
 
     // start clean
     clearChipInfo();
 
     // Buffer group
-    auto *groupBuffer = new QGroupBox("Buffer", leftBox);
+    auto *groupBuffer = new QGroupBox(leftBox);
     auto *gridB  = new QGridLayout(groupBuffer);
     btnClear     = new QPushButton("Clear buffer", groupBuffer);
     btnSave      = new QPushButton("Save buffer", groupBuffer);
     btnRead      = new QPushButton("Read from target",  groupBuffer);
+    btnRead->hide();
     btnWrite     = new QPushButton("Write to target", groupBuffer);
+    btnWrite->hide();
     chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
     btnLoadBinary   = new QPushButton("Load file to buffer", groupBuffer);
     btnLoadAdvanced = new QPushButton("Advanced load…", groupBuffer);
@@ -287,26 +325,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridB->addWidget(progReadWrite,   5, 0, 1, 2);
 
     groupBuffer->setLayout(gridB);
-    leftLayout->addWidget(groupBuffer);
+    leftLayout->addWidget(groupBuffer, 0);
 
     // Device operations group (sits between Buffer and Options)
-    auto *groupDevOps = new QGroupBox("Device operations", leftBox);
+    groupDevOps = new QGroupBox(leftBox);
     auto *gridDO      = new QGridLayout(groupDevOps);
 
     btnBlankCheck  = new QPushButton("Blank check",  groupDevOps);
     btnEraseDevice = new QPushButton("Erase device", groupDevOps);
     btnTestLogic   = new QPushButton("Test logic",   groupDevOps);
-
     // Layout: two columns, then one full-width
     gridDO->addWidget(btnBlankCheck,  0, 0);
     gridDO->addWidget(btnEraseDevice, 0, 1);
     gridDO->addWidget(btnTestLogic,   1, 0, 1, 2);
 
     groupDevOps->setLayout(gridDO);
-    leftLayout->addWidget(groupDevOps);
+    leftLayout->addWidget(groupDevOps, 0);
 
     // Device Options
-    auto *groupOpts  = new QGroupBox("Device Options", leftBox);
+    groupOpts  = new QGroupBox(leftBox);
     auto *gridO      = new QGridLayout(groupOpts);
     chkSkipVerify    = new QCheckBox("Skip verify", groupOpts);
     chkIgnoreId      = new QCheckBox("Ignore ID error", groupOpts);
@@ -320,12 +357,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridO->addWidget(chkNoSizeErr,     1,1);
 
     groupOpts->setLayout(gridO);
-    leftLayout->addWidget(groupOpts);
+    leftLayout->addWidget(groupOpts, 0);
     leftLayout->addStretch();
 
     // right side (hex + legend + log)
-    auto *rightSplitter = new QSplitter(Qt::Vertical, central);
-    tableHex = new QTableView(rightSplitter);
+    rightSplitter = new QSplitter(Qt::Vertical, central);
+    tableHex = new HexTableView(rightSplitter);
 
     // Buffer legend table
     legendTable = new SegmentTableView(rightSplitter);
@@ -376,16 +413,48 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     rightSplitter->setStretchFactor(1, 1);
     rightSplitter->setStretchFactor(2, 3);
 
+    const QByteArray rightSplitterState = settings.value("mainWindow/rightSplitterState").toByteArray();
+    if (!rightSplitterState.isEmpty()) {
+        rightSplitter->restoreState(rightSplitterState);
+    }
+
     // Hex view/model
     hexModel = new HexView(this);
     hexModel->setBufferRef(&buffer_);
     tableHex->setModel(hexModel);
+
+    // Set up monospace font for hex view
+    QStringList preferredFonts = {
+        "Courier New",
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+        "Monospace",
+        "Consolas",
+        "Menlo"
+    };
+
+    QString chosenFamily;
+    const QStringList availableFamilies = QFontDatabase::families();
+    for (const QString &family : preferredFonts) {
+        if (availableFamilies.contains(family)) {
+            chosenFamily = family;
+            break;
+        }
+    }
+
     QFont mono;
-    mono.setFamily("Courier New");
-    mono.setStyleHint(QFont::TypeWriter);
+    if (chosenFamily.isEmpty()) {
+        // Fallback to system fixed font
+        mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    } else {
+        mono.setFamily(chosenFamily);
+        mono.setStyleHint(QFont::TypeWriter);
+    }
+
     mono.setPointSizeF(this->font().pointSizeF() - 1);
     tableHex->setFont(mono);
     tableHex->setWordWrap(false);
+    hexModel->setHexFont(mono);  // Pass the same font to the model
     tableHex->setAlternatingRowColors(true);
     tableHex->setSelectionBehavior(QAbstractItemView::SelectItems);
     tableHex->verticalHeader()->setDefaultSectionSize(20);
@@ -405,14 +474,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // ASCII column
     tableHex->horizontalHeader()->setStretchLastSection(true);
 
-    auto *split = new QSplitter(Qt::Horizontal, central);
-    split->addWidget(leftBox);
-    split->addWidget(rightSplitter);
-    split->setStretchFactor(0, 0);
-    split->setStretchFactor(1, 1);
-
+    mainSplitter = new QSplitter(Qt::Horizontal, central);
+    mainSplitter->addWidget(leftBox);
+    mainSplitter->addWidget(rightSplitter);
+    mainSplitter->setStretchFactor(0, 0);
+    mainSplitter->setStretchFactor(1, 1);
+    //QSettings settings;
+    const QByteArray mainSplitterState = settings.value("mainWindow/mainSplitterState").toByteArray();
+    if (!mainSplitterState.isEmpty()) {
+        mainSplitter->restoreState(mainSplitterState);
+    }
     auto *rootLayout = new QVBoxLayout(central);
-    rootLayout->addWidget(split);
+    rootLayout->addWidget(mainSplitter);
 
     // button wiring
     connect(btnClear, &QPushButton::clicked, this, [this]{
@@ -655,21 +728,48 @@ void MainWindow::updateActionEnabling() {
     if (chkAsciiSwap) chkAsciiSwap->setEnabled(hasBuffer);
     if (btnSave)      btnSave->setEnabled(hasBuffer);
 
-    // Separate logic ICs from memory devices
-    if (currentIsLogic_) {
-        // Logic IC: only “Test logic” makes sense
-        if (btnEraseDevice) btnEraseDevice->setEnabled(false);
-        if (btnBlankCheck)  btnBlankCheck->setEnabled(false);
-        if (btnRead)        btnRead->setEnabled(false);
-        if (btnWrite)       btnWrite->setEnabled(false);
-        if (btnTestLogic)   btnTestLogic->setEnabled(deviceSelected);
+    // Show/hide device-specific widgets based on device selection
+    if (deviceSelected) {
+        if (groupDevOps) groupDevOps->show();
+        if (currentIsLogic_) {
+            // Logic IC: only "Test logic" makes sense
+            if (btnEraseDevice) btnEraseDevice->hide();
+            if (btnBlankCheck)  btnBlankCheck->hide();
+            if (btnRead)        btnRead->hide();
+            if (btnWrite)       btnWrite->hide();
+            if (btnTestLogic)   btnTestLogic->show();
+            if (btnTestLogic)   btnTestLogic->setEnabled(true);
+            if (groupOpts)      groupOpts->hide();
+        } else {
+            // Memory device: buffer ops + blank/erase; no logic test
+            if (btnEraseDevice) btnEraseDevice->show();
+            if (btnBlankCheck)  btnBlankCheck->show();
+            if (btnRead)        btnRead->show();
+            if (btnTestLogic)   btnTestLogic->hide();
+            if (groupOpts)      groupOpts->show();
+
+            if (btnWrite) {
+                if (hasBuffer) {
+                    btnWrite->show();
+                    btnWrite->setEnabled(true);
+                } else {
+                    btnWrite->hide();
+                }
+            }
+
+            if (btnEraseDevice) btnEraseDevice->setEnabled(true);
+            if (btnBlankCheck)  btnBlankCheck->setEnabled(true);
+            if (btnRead)        btnRead->setEnabled(true);
+        }
     } else {
-        // Memory device: buffer ops + blank/erase; no logic test
-        if (btnEraseDevice) btnEraseDevice->setEnabled(deviceSelected);
-        if (btnBlankCheck)  btnBlankCheck->setEnabled(deviceSelected);
-        if (btnTestLogic)   btnTestLogic->setEnabled(false);
-        if (btnRead)        btnRead->setEnabled(deviceSelected);
-        if (btnWrite)       btnWrite->setEnabled(deviceSelected && hasBuffer);
+        // No device selected - hide all device-specific widgets
+        if (btnEraseDevice) btnEraseDevice->hide();
+        if (btnBlankCheck)  btnBlankCheck->hide();
+        if (btnRead)        btnRead->hide();
+        if (btnWrite)       btnWrite->hide();
+        if (btnTestLogic)   btnTestLogic->hide();
+        if (groupDevOps)    groupDevOps->hide();
+        if (groupOpts)      groupOpts->hide();
     }
 }
 
@@ -731,20 +831,30 @@ QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
 
 void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
 {
-    // graceful fallbacks for partial info
-    chipName     ->setText(ci.baseName.isEmpty()   ? "-" : ci.baseName);
-    chipPackage  ->setText(ci.package.isEmpty()    ? "-" : ci.package);
     if (ci.isLogic) {
         currentIsLogic_ = true;
-        chipMemory  ->setText("-");  // logic ICs don’t have a byte size
-        chipBusWidth->setText(QString("Logic IC%1")
-                              .arg(ci.vectorCount > 0 ? QString(" (%1 vectors)").arg(ci.vectorCount) : QString()));
+
+        if (memoryInfoGroup_) memoryInfoGroup_->setVisible(false);
+        if (logicInfoGroup_) logicInfoGroup_->setVisible(true);
+
+        logicName->setText(ci.baseName.isEmpty() ? "-" : ci.baseName);
+        logicPackage->setText(ci.package.isEmpty() ? "-" : ci.package);
+        logicVectors->setText(ci.vectorCount > 0 ? QString::number(ci.vectorCount) : "-");
+        logicVCC->setText(ci.vcc.isEmpty() ? "-" : ci.vcc);
     } else {
         currentIsLogic_ = false;
-        chipMemory  ->setText(prettyBytes(ci.bytes));
+
+        if (memoryInfoGroup_) memoryInfoGroup_->setVisible(true);
+        if (logicInfoGroup_) logicInfoGroup_->setVisible(false);
+
+        chipName->setText(ci.baseName.isEmpty() ? "-" : ci.baseName);
+        chipPackage->setText(ci.package.isEmpty() ? "-" : ci.package);
+        chipMemory->setText(prettyBytes(ci.bytes));
         chipBusWidth->setText(ci.wordBits > 0 ? QString("%1-bit").arg(ci.wordBits) : "-");
+        chipProtocol->setText(ci.protocol.isEmpty() ? "-" : ci.protocol);
+        chipVCC->setText(ci.vcc.isEmpty() ? "-" : ci.vcc);
+        chipVPP->setText(ci.vpp.isEmpty() ? "-" : ci.vpp);
     }
-    chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
 
     applyLogFontForDevice();
     updateActionEnabling();
@@ -753,8 +863,10 @@ void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
 void MainWindow::clearChipInfo()
 {
     currentIsLogic_ = false;
-    ProcessHandling::ChipInfo blank;
-    updateChipInfo(blank);
+
+    // Hide both groups
+    if (memoryInfoGroup_) memoryInfoGroup_->setVisible(false);
+    if (logicInfoGroup_) logicInfoGroup_->setVisible(false);
 }
 
 void MainWindow::saveBufferToFile() {
@@ -1497,4 +1609,21 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
 
     bufferSegments = std::move(coalesced);
     updateLegendTable();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    QSettings settings;
+
+    // Save window geometry
+    settings.setValue("mainWindow/geometry", saveGeometry());
+
+    // Save splitter states
+    if (mainSplitter) {
+        settings.setValue("mainWindow/mainSplitterState", mainSplitter->saveState());
+    }
+    if (rightSplitter) {
+        settings.setValue("mainWindow/rightSplitterState", rightSplitter->saveState());
+    }
+
+    QMainWindow::closeEvent(event);
 }

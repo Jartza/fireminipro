@@ -144,6 +144,14 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
         }
     }
 
+    // Package: "DIP14"
+    {
+        const QString packageLine = cap1(rxLine("Package"));
+        if (ci.package.isEmpty() && !packageLine.isEmpty()) {
+            ci.package = packageLine.trimmed();
+        }
+    }
+
     // Memory: "8192 Bytes" or "262144 Words"
     {
         QRegularExpression rxMem(R"(^\s*Memory\s*:\s*([0-9]+)\s*(Bytes?|Words?)\s*$)",
@@ -192,6 +200,32 @@ ProcessHandling::ChipInfo ProcessHandling::parseChipInfo(const QString &text) co
     ci.readBuf  = parseSize("Read buffer size");
     ci.writeBuf = parseSize("Write buffer size");
 
+    // VCC and VPP voltages - handle various formats
+    {
+        // Format: "Default VCC voltage: 5 V"
+        static QRegularExpression reVcc1(R"(^\s*Default\s+VCC\s+voltage\s*:\s*([^\n]+))",
+                                          QRegularExpression::MultilineOption | QRegularExpression::CaseInsensitiveOption);
+        auto m = reVcc1.match(text);
+        if (m.hasMatch()) {
+            ci.vcc = m.captured(1).trimmed();
+        }
+
+        // Format: "Default VCC verify voltage: 5 V"
+        static QRegularExpression reVcc2(R"(^\s*Default\s+VCC\s+verify\s+voltage\s*:\s*([^\n]+))",
+                                          QRegularExpression::MultilineOption | QRegularExpression::CaseInsensitiveOption);
+        m = reVcc2.match(text);
+        if (m.hasMatch() && ci.vcc.isEmpty()) {
+            ci.vcc = m.captured(1).trimmed();
+        }
+
+        // Format: "Default VPP programming voltage: 12 V"
+        static QRegularExpression reVpp(R"(^\s*Default\s+VPP\s+programming\s+voltage\s*:\s*([^\n]+))",
+                                         QRegularExpression::MultilineOption | QRegularExpression::CaseInsensitiveOption);
+        m = reVpp.match(text);
+        if (m.hasMatch()) {
+            ci.vpp = m.captured(1).trimmed();
+        }
+    }
     return ci;
 }
 

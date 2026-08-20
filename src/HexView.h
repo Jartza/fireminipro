@@ -2,6 +2,7 @@
 
 #include <QAbstractTableModel>
 #include <QByteArray>
+#include <QFont>
 #include <QSet>
 
 class HexView : public QAbstractTableModel {
@@ -16,6 +17,9 @@ public:
     int  getBytesPerRow() const { return bytesPerRow_; }
 
     void setSwapAscii16(bool on);
+
+    QFont hexFont() const { return hexFont_; }
+    void setHexFont(const QFont &font) { hexFont_ = font; }
 
     // QAbstractTableModel
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -37,4 +41,5 @@ private:
     int         bytesPerRow_{16};
     bool        swapAscii16_{false};
     QSet<qint64> dirty_;
+    QFont hexFont_;
 };
