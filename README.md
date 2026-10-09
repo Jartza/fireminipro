@@ -156,3 +156,13 @@ The corresponding source archives and licence texts live in [`thirdparty/`](thir
 The DMG/AppImage builds copy the relevant licences into `Resources/thirdparty/` so users
 always have access to the attribution and source information. Details about the Qt 6
 modules and their LGPL requirements are documented in [`thirdparty/README_qt.md`](thirdparty/README_qt.md).
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=jartza%2Ffireminipro&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=jartza/fireminipro&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=jartza/fireminipro&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=jartza/fireminipro&type=date&legend=top-left" />
+ </picture>
+</a>
