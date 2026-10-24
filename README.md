@@ -28,14 +28,12 @@ It aims to provide a comfortable workflow for both hobbyists and professionals w
 
 ---
 
-## Releases
+## Prerequisites
 
 If you do not feel comfortable building software yourself, there are
 **AppImage for Linux** and **DMG for MacOs** (12 and up) provided in the [releases](https://github.com/Jartza/fireminipro/releases/) page.
 
 ---
-
-## Building prerequisites
 
 ### macOS
 Install dependencies using [Homebrew](https://brew.sh/):
@@ -71,6 +69,14 @@ sudo apt install build-essential ninja-build cmake libgl1-mesa-dev qt6-base-dev 
 > make
 > sudo make install
 > ```
+> HINT: minipro has a working deb build setup:
+>
+>    git clone https://gitlab.com/DavidGriffith/minipro.git
+>    cd minipro
+>    make deb
+>    sudo apt install $(ls ../minipro_*.deb | tail -1)
+>
+> This will install the latest version of minipro (in case you built also previous versions).
 
 ---
 

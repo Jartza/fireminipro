@@ -1,3 +1,4 @@
+# .github/workflows/appimage.yml
 name: Linux AppImage
 on:
   push:
@@ -9,18 +10,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-        # Ensures full git history for git describe
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-
       - name: Install deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential ninja-build cmake libgl1-mesa-dev patchelf \
             pkg-config libusb-1.0-0-dev zlib1g-dev \
             qt6-base-dev qt6-base-dev-tools qt6-tools-dev qt6-tools-dev-tools
-
       - name: Make Qt6 qmake discoverable
         run: |
           if [ -x /usr/lib/qt6/bin/qmake6 ]; then
@@ -30,24 +25,10 @@ jobs:
             sudo ln -sf /usr/lib/qt6/bin/qmake /usr/local/bin/qmake
           fi
           qmake -v || true
-
-      - name: Determine version
-        id: version
-        run: |
-          # Use git describe to get the version
-          ver=$(git describe --tags --always --match "v[0-9]*" 2>/dev/null || echo "${GITHUB_REF_NAME}")
-          # Remove leading v if present
-          ver="${ver#v}"
-          # Remove hash at end (for tagged builds)
-          ver="${ver%%-g*}"
-          echo "VERSION=$ver" >> $GITHUB_ENV
-          echo "Determined version: $ver"
-
       - name: Build
         run: |
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/usr/lib/qt6
           ninja -C build
-
       - name: Build minipro CLI
         env:
           MINIPRO_VERSION: 0.7.4
@@ -67,13 +48,11 @@ jobs:
           sed -i 's#rm -f $(SHARE_INSTDIR)#rm -f $(INSTALL_SHARE_INSTDIR)#' Makefile
           make PREFIX=/usr SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR=
           make PREFIX=/usr DESTDIR="$MINIPRO_STAGING" SHARE_INSTDIR=/usr/share/minipro UDEV_DIR= COMPLETIONS_DIR= install
-
       - name: Fetch linuxdeploy tooling
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
-
       - name: Bundle AppImage
         env:
           QMAKE: /usr/lib/qt6/bin/qmake6
@@ -82,7 +61,6 @@ jobs:
           LINUXDEPLOY_QT_AUTO_INCLUDE_MODULES: 1
           QT_SELECT: qt6
           APPIMAGE_EXTRACT_AND_RUN: 1
-          VERSION: ${{ env.VERSION }}
         run: |
           export PATH=/usr/lib/qt6/bin:$PATH
           export QMAKE=/usr/lib/qt6/bin/qmake6
@@ -114,10 +92,6 @@ jobs:
               cp -R "$MINIPRO_STAGING/share/licenses" AppDir/usr/share/licenses/
             fi
           fi
-          mkdir -p AppDir/usr/share/doc/fireminipro/thirdparty
-          cp thirdparty/LICENSE_* AppDir/usr/share/doc/fireminipro/thirdparty/
-          cp thirdparty/README_*.md AppDir/usr/share/doc/fireminipro/thirdparty/
-          cp thirdparty/*.tar.bz2 AppDir/usr/share/doc/fireminipro/thirdparty/
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \
@@ -130,41 +104,16 @@ jobs:
           if [ -f AppDir/usr/bin/minipro ]; then
             extra_flags+=(--executable AppDir/usr/bin/minipro)
           fi
-          # Build AppImage with correct versioned filename
           ./linuxdeploy-x86_64.AppImage --appdir AppDir \
             --executable AppDir/usr/bin/fireminipro \
             -d AppDir/usr/share/applications/fireminipro.desktop \
             -i AppDir/usr/share/icons/hicolor/256x256/apps/fireminipro.png \
             "${extra_flags[@]}" \
             --plugin qt --output appimage
-          # Rename the output file
-          src=$(ls FireMinipro*.AppImage | head -n 1)
-          dst="FireMinipro-${VERSION}-x86_64.AppImage"
-          if [ "$src" != "$dst" ]; then
-            mv "$src" "$dst"
-          fi
-          # Clean up
           rm -f linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
-
-      - name: Determine release tag
-        id: release
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            TAG_NAME="${GITHUB_REF_NAME}"
-            if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-              git tag "$TAG_NAME"
-              git push origin "$TAG_NAME"
-            fi
-          else
-            TAG_NAME="${GITHUB_REF_NAME}"
-          fi
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-          echo "Release tag: $TAG_NAME"
-
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: FireMinipro-${{ env.VERSION }}-x86_64.AppImage
-          tag_name: ${{ steps.release.outputs.tag_name }}
+          files: ./*.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
