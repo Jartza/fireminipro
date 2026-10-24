@@ -64,6 +64,7 @@ set(SOURCES
 set(HEADERS
     src/MainWindow.h
     src/HexView.h
+    src/HexTableView.h
     src/ProcessHandling.h
     src/LoadPreviewBar.h
     src/SegmentView.h

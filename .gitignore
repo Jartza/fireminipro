@@ -1,0 +1,11 @@
+build
+CMakeLists.txt.user
+
+*~
+.*~
+
+*.bak
+*.new
+*.old
+*.orig
+*.work

@@ -5,13 +5,15 @@
 #include <QByteArray>
 #include <QStringList>
 #include <QUrl>
+#include <QSplitter>
 #include "ProcessHandling.h"
 
 class QComboBox;
 class QPushButton;
-class QTableView;
+class HexTableView;
 class QPlainTextEdit;
 class QCheckBox;
+class QGroupBox;
 class QLabel;
 class QWidget;
 class HexView;
@@ -46,14 +48,24 @@ private:
     QComboBox   *comboDevice{};
     QPushButton *btnRescan{};
 
-    // Chip information
+    // Chip information - Memory
     QLabel      *chipName{};
     QLabel      *chipPackage{};
     QLabel      *chipMemory{};
     QLabel      *chipBusWidth{};
     QLabel      *chipProtocol{};
-    QLabel      *chipReadBuf{};
-    QLabel      *chipWriteBuf{};
+    QLabel      *chipVCC{};
+    QLabel      *chipVPP{};
+
+    // Chip information - Logic
+    QLabel      *logicName{};
+    QLabel      *logicPackage{};
+    QLabel      *logicVectors{};
+    QLabel      *logicVCC{};
+
+    // Info groups
+    QGroupBox *memoryInfoGroup_{};
+    QGroupBox *logicInfoGroup_{};
 
     // Buffer group
     QPushButton *btnClear{};
@@ -66,18 +78,20 @@ private:
     QLabel      *lblBufSize{};
 
     // Device operations
+    QGroupBox   *groupDevOps{};
     QPushButton *btnBlankCheck{};
     QPushButton *btnEraseDevice{};
     QPushButton *btnTestLogic{};
 
     // Device options
+    QGroupBox *groupOpts{};
     QCheckBox *chkSkipVerify{};
     QCheckBox *chkIgnoreId{};
     QCheckBox *chkSkipId{};
     QCheckBox *chkNoSizeErr{};
 
     // Views
-    QTableView     *tableHex{};
+    HexTableView   *tableHex{};
     QPlainTextEdit *log{};
     QFont logFontDefault_;
     QFont logFontFixed_;
@@ -135,7 +149,11 @@ private:
     void ensureBufferSize(int newSize, char padByte);
     void patchBuffer(int offset, const QByteArray &data, char padByte);
 
+    QSplitter *mainSplitter;      // Horizontal splitter
+    QSplitter *rightSplitter;     // Vertical splitter
+
 protected:
       bool eventFilter(QObject *obj, QEvent *event) override;
+      void closeEvent(QCloseEvent *event) override;
 
 };

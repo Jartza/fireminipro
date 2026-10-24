@@ -73,6 +73,24 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
 
     const qint64 rowBase = qint64(r) * bytesPerRow_;
 
+    // Add foreground color for high contrast
+    if (role == Qt::ForegroundRole) {
+        if (c == 0) {
+            // Address column - dim but readable
+            return QBrush(QColor(0x88, 0x88, 0x88));  // Gray
+        }
+        else if (c >= 1 && c <= bytesPerRow_) {
+            // Hex bytes - bright, high contrast
+            return QBrush(QColor(0x00, 0x00, 0x00));  // Black on light bg
+            // Or for dark theme: QColor(0xE0, 0xE0, 0xE0)
+        }
+        else if (c == 1 + bytesPerRow_) {
+            // ASCII column - different color to distinguish
+            return QBrush(QColor(0x00, 0x00, 0xCC));  // Dark blue
+        }
+        return {};  // Add this return for safety
+    }
+
     // Background tint for dirty bytes (hex columns) or for ascii row if any byte dirty
     if (role == Qt::BackgroundRole) {
         if (c >= 1 && c <= bytesPerRow_) {
@@ -84,6 +102,19 @@ QVariant HexView::data(const QModelIndex &idx, int role) const {
                 if (off < buffer_->size() && isDirty(off)) return QBrush(QColor(255,245,200));
             }
         }
+        return {};  // Add this return for non-dirty cells
+    }
+
+    // Add font role for monospace
+    if (role == Qt::FontRole) {
+        QFont font("Monospace");
+        font.setStyleHint(QFont::TypeWriter);
+        font.setPointSize(10);
+        return font;
+    }
+
+    if (role == Qt::FontRole) {
+        return hexFont_;
     }
 
     if (role == Qt::TextAlignmentRole) {
