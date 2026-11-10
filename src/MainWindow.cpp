@@ -13,6 +13,10 @@
 #include <QAbstractItemView>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
+#include <QLibraryInfo>
+#include <QSettings>
+#include <QTranslator>
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QHeaderView>
@@ -54,25 +58,30 @@
 #include "LoadPreviewBar.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    // The constructor builds the entire UI programmatically.
-    // This avoids the need for .ui files and Qt Designer.
+    // Load preferred UI language before building translated widgets.
+    {
+        QSettings settings;
+        const QString envLang = qEnvironmentVariable("FIREMINIPRO_LANG").trimmed();
+        const QString initialLang = envLang.isEmpty()
+            ? settings.value(QStringLiteral("ui/language"), QStringLiteral("auto")).toString()
+            : envLang;
+        applyLanguage(initialLang, false);
+    }
 
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    setWindowTitle(tr("FireMinipro - An Open Source GUI for minipro CLI tool %1")
-                   .arg(QStringLiteral(FIREMINIPRO_VERSION)));
     this->setMinimumSize(1050,768);
 
     // Menu bar
     auto *mb = menuBar();
 
     // App menu (macOS will merge this into the app menu automatically)
-    auto *menuApp = mb->addMenu(tr("&FireMinipro"));
+    menuApp_ = mb->addMenu(tr("&FireMinipro"));
 
-    auto *actAbout = new QAction(tr("&About FireMinipro…"), this);
-    actAbout->setMenuRole(QAction::AboutRole); // macOS-native placement
-    connect(actAbout, &QAction::triggered, this, [this]{
+    actAbout_ = new QAction(tr("&About FireMinipro…"), this);
+    actAbout_->setMenuRole(QAction::AboutRole); // macOS-native placement
+    connect(actAbout_, &QAction::triggered, this, [this]{
         const QString ver = QStringLiteral(FIREMINIPRO_VERSION);
         const QString qt  = QString::fromLatin1(qVersion());
 
@@ -88,35 +97,59 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         box.setIconPixmap(QPixmap(":/appicon.png").scaled(96,96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         box.exec();
     });
-    menuApp->addAction(actAbout);
-    menuApp->addSeparator();
+    menuApp_->addAction(actAbout_);
+    menuApp_->addSeparator();
 
-    auto *actQuit = new QAction(tr("&Quit"), this);
-    actQuit->setShortcuts(QKeySequence::Quit);
-    actQuit->setMenuRole(QAction::QuitRole);
-    connect(actQuit, &QAction::triggered, qApp, &QCoreApplication::quit);
-    menuApp->addAction(actQuit);
+    actQuit_ = new QAction(tr("&Quit"), this);
+    actQuit_->setShortcuts(QKeySequence::Quit);
+    actQuit_->setMenuRole(QAction::QuitRole);
+    connect(actQuit_, &QAction::triggered, qApp, &QCoreApplication::quit);
+    menuApp_->addAction(actQuit_);
+
+    // Language menu
+    menuLanguage_ = mb->addMenu(tr("&Language"));
+    auto *langGroup = new QActionGroup(this);
+    langGroup->setExclusive(true);
+
+    actLangAuto_ = new QAction(tr("System Default"), this);
+    actLangAuto_->setCheckable(true);
+    actLangEn_ = new QAction(QStringLiteral("English"), this);
+    actLangEn_->setCheckable(true);
+    actLangJa_ = new QAction(QStringLiteral("日本語 (Japanese)"), this);
+    actLangJa_->setCheckable(true);
+
+    for (QAction *a : {actLangAuto_, actLangEn_, actLangJa_}) {
+        langGroup->addAction(a);
+        menuLanguage_->addAction(a);
+    }
+    actLangAuto_->setChecked(currentLangCode_ == QLatin1String("auto"));
+    actLangEn_->setChecked(currentLangCode_ == QLatin1String("en"));
+    actLangJa_->setChecked(currentLangCode_ == QLatin1String("ja"));
+
+    connect(actLangAuto_, &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("auto"), true); retranslateUi(); });
+    connect(actLangEn_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("en"),   true); retranslateUi(); });
+    connect(actLangJa_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("ja"),   true); retranslateUi(); });
 
     // Left column
     auto *leftBox = new QWidget(central);
     auto *leftLayout = new QVBoxLayout(leftBox);
 
     // Target group
-    auto *groupTargets = new QGroupBox(tr("Target"), leftBox);
-    auto *gridT = new QGridLayout(groupTargets);
-    auto *lblProg = new QLabel(tr("Programmer:"), groupTargets);
-    auto *lblDev  = new QLabel(tr("Device:"),     groupTargets);
-    comboProgrammer = new QComboBox(groupTargets);
-    comboDevice = new QComboBox(groupTargets);
-    btnRescan = new QPushButton(tr("Rescan"), groupTargets);
+    groupTargets_ = new QGroupBox(leftBox);
+    auto *gridT = new QGridLayout(groupTargets_);
+    lblProg_ = new QLabel(groupTargets_);
+    lblDev_  = new QLabel(groupTargets_);
+    comboProgrammer = new QComboBox(groupTargets_);
+    comboDevice = new QComboBox(groupTargets_);
+    btnRescan = new QPushButton(groupTargets_);
     QFont small = this->font();
     small.setPointSizeF(this->font().pointSizeF() - 1);
-    lblProg->setFont(small);
-    lblDev->setFont(small);
+    lblProg_->setFont(small);
+    lblDev_->setFont(small);
 
-    gridT->addWidget(lblProg,         0, 0);
+    gridT->addWidget(lblProg_,        0, 0);
     gridT->addWidget(comboProgrammer, 0, 1);
-    gridT->addWidget(lblDev,          1, 0);
+    gridT->addWidget(lblDev_,         1, 0);
     gridT->addWidget(comboDevice,     1, 1, 1, 2);
     gridT->addWidget(btnRescan,       0, 2, 1, 1, Qt::AlignRight | Qt::AlignTop);
     
@@ -129,10 +162,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridT->setColumnStretch(2, 0);
     gridT->setHorizontalSpacing(4);
 
-    comboProgrammer->setPlaceholderText(tr("No programmer"));
-    comboDevice->setPlaceholderText(tr("No devices"));
-    groupTargets->setLayout(gridT);
-    leftLayout->addWidget(groupTargets);
+    groupTargets_->setLayout(gridT);
+    leftLayout->addWidget(groupTargets_);
 
     // Make device combobox searchable / filterable
     // and editable to allow custom device names,
@@ -224,55 +255,54 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
     // Chip information (between Target and Buffer)
-    auto *groupChipInfo = new QGroupBox(tr("Chip information"), leftBox);
-    auto *gridC = new QGridLayout(groupChipInfo);
+    groupChipInfo_ = new QGroupBox(leftBox);
+    auto *gridC = new QGridLayout(groupChipInfo_);
 
     // left column (keys), right column (values)
-    auto addRow = [&](int r, const QString &key, QLabel *&valueOut) {
-        auto *k = new QLabel(key, groupChipInfo);
-        k->setFont(small);
-        k->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        valueOut = new QLabel("-", groupChipInfo);
+    auto addRow = [&](int r, QLabel *&keyOut, QLabel *&valueOut) {
+        keyOut = new QLabel(groupChipInfo_);
+        keyOut->setFont(small);
+        keyOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        valueOut = new QLabel("-", groupChipInfo_);
         valueOut->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        gridC->addWidget(k, r, 0);
+        gridC->addWidget(keyOut, r, 0);
         gridC->addWidget(valueOut, r, 1);
     };
 
     // rows
     int r = 0;
-    addRow(r++, tr("Name:"),           chipName);
-    addRow(r++, tr("Package:"),        chipPackage);
-    addRow(r++, tr("Memory:"),         chipMemory);
-    addRow(r++, tr("Mem width:"),      chipBusWidth);
-    addRow(r++, tr("Protocol:"),       chipProtocol);
+    addRow(r++, lblChipKeyName_,  chipName);
+    addRow(r++, lblChipKeyPkg_,   chipPackage);
+    addRow(r++, lblChipKeyMem_,   chipMemory);
+    addRow(r++, lblChipKeyWidth_, chipBusWidth);
+    addRow(r++, lblChipKeyProto_, chipProtocol);
 
     gridC->setColumnStretch(0, 0);
     gridC->setColumnStretch(1, 1);
-    groupChipInfo->setLayout(gridC);
-    leftLayout->addWidget(groupChipInfo);
+    groupChipInfo_->setLayout(gridC);
+    leftLayout->addWidget(groupChipInfo_);
 
     // start clean
     clearChipInfo();
 
     // Buffer group
-    auto *groupBuffer = new QGroupBox(tr("Buffer"), leftBox);
-    auto *gridB  = new QGridLayout(groupBuffer);
-    btnClear     = new QPushButton(tr("Clear buffer"), groupBuffer);
-    btnSave      = new QPushButton(tr("Save buffer"), groupBuffer);
-    btnRead      = new QPushButton(tr("Read from target"),  groupBuffer);
-    btnWrite     = new QPushButton(tr("Write to target"), groupBuffer);
-    chkAsciiSwap = new QCheckBox(tr("ASCII byteswap (16-bit)"), groupBuffer);
-    btnLoadBinary   = new QPushButton(tr("Load file to buffer"), groupBuffer);
-    btnLoadAdvanced = new QPushButton(tr("Advanced load…"), groupBuffer);
-    progReadWrite = new QProgressBar(groupBuffer);
+    groupBuffer_ = new QGroupBox(leftBox);
+    auto *gridB  = new QGridLayout(groupBuffer_);
+    btnClear     = new QPushButton(groupBuffer_);
+    btnSave      = new QPushButton(groupBuffer_);
+    btnRead      = new QPushButton(groupBuffer_);
+    btnWrite     = new QPushButton(groupBuffer_);
+    chkAsciiSwap = new QCheckBox(groupBuffer_);
+    btnLoadBinary   = new QPushButton(groupBuffer_);
+    btnLoadAdvanced = new QPushButton(groupBuffer_);
+    progReadWrite = new QProgressBar(groupBuffer_);
 
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
-    progReadWrite->setFormat(tr("Idle"));
     progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
-    if (!lblBufSize)  lblBufSize  = new QLabel(tr("Size: 0 (0x0)"), groupBuffer);
+    if (!lblBufSize)  lblBufSize  = new QLabel(groupBuffer_);
 
     gridB->addWidget(btnLoadBinary,   0, 0, 1, 1);
     gridB->addWidget(btnLoadAdvanced, 0, 1, 1, 1);
@@ -284,32 +314,32 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridB->addWidget(lblBufSize,      4, 0, 1, 2);
     gridB->addWidget(progReadWrite,   5, 0, 1, 2);
 
-    groupBuffer->setLayout(gridB);
-    leftLayout->addWidget(groupBuffer);
+    groupBuffer_->setLayout(gridB);
+    leftLayout->addWidget(groupBuffer_);
 
     // Device operations group (sits between Buffer and Options)
-    auto *groupDevOps = new QGroupBox(tr("Device operations"), leftBox);
-    auto *gridDO      = new QGridLayout(groupDevOps);
+    groupDevOps_ = new QGroupBox(leftBox);
+    auto *gridDO = new QGridLayout(groupDevOps_);
 
-    btnBlankCheck  = new QPushButton(tr("Blank check"),  groupDevOps);
-    btnEraseDevice = new QPushButton(tr("Erase device"), groupDevOps);
-    btnTestLogic   = new QPushButton(tr("Test logic"),   groupDevOps);
+    btnBlankCheck  = new QPushButton(groupDevOps_);
+    btnEraseDevice = new QPushButton(groupDevOps_);
+    btnTestLogic   = new QPushButton(groupDevOps_);
 
     // Layout: two columns, then one full-width
     gridDO->addWidget(btnBlankCheck,  0, 0);
     gridDO->addWidget(btnEraseDevice, 0, 1);
     gridDO->addWidget(btnTestLogic,   1, 0, 1, 2);
 
-    groupDevOps->setLayout(gridDO);
-    leftLayout->addWidget(groupDevOps);
+    groupDevOps_->setLayout(gridDO);
+    leftLayout->addWidget(groupDevOps_);
 
     // Device Options
-    auto *groupOpts  = new QGroupBox(tr("Device Options"), leftBox);
-    auto *gridO      = new QGridLayout(groupOpts);
-    chkSkipVerify    = new QCheckBox(tr("Skip verify"), groupOpts);
-    chkIgnoreId      = new QCheckBox(tr("Ignore ID error"), groupOpts);
-    chkSkipId        = new QCheckBox(tr("Skip ID check"), groupOpts);
-    chkNoSizeErr     = new QCheckBox(tr("Ignore size error"), groupOpts);
+    groupOpts_  = new QGroupBox(leftBox);
+    auto *gridO = new QGridLayout(groupOpts_);
+    chkSkipVerify = new QCheckBox(groupOpts_);
+    chkIgnoreId   = new QCheckBox(groupOpts_);
+    chkSkipId     = new QCheckBox(groupOpts_);
+    chkNoSizeErr  = new QCheckBox(groupOpts_);
 
     // layout options (2 columns)
     gridO->addWidget(chkSkipVerify,    0,0);
@@ -317,8 +347,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridO->addWidget(chkSkipId,        1,0);
     gridO->addWidget(chkNoSizeErr,     1,1);
 
-    groupOpts->setLayout(gridO);
-    leftLayout->addWidget(groupOpts);
+    groupOpts_->setLayout(gridO);
+    leftLayout->addWidget(groupOpts_);
     leftLayout->addStretch();
 
     // right side (hex + legend + log)
@@ -538,6 +568,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Disable UI buttons when minipro is running
     connect(proc, &ProcessHandling::started, this, [this]{
+        processBusy_ = true;
         disableBusyButtons();
         QApplication::setOverrideCursor(Qt::BusyCursor);
     });
@@ -546,6 +577,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // and that the UI is re-enabled after process completion
     connect(proc, &ProcessHandling::finished, this,
         [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
+            processBusy_ = false;
             // Always restore UI first
             updateActionEnabling();
             QApplication::restoreOverrideCursor();
@@ -590,6 +622,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // initial state
     setUiEnabled(true);
     updateActionEnabling();
+    retranslateUi();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
@@ -729,6 +762,7 @@ QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
 
 void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
 {
+    lastChipInfo_ = ci;
     // graceful fallbacks for partial info
     chipName     ->setText(ci.baseName.isEmpty()   ? "-" : ci.baseName);
     chipPackage  ->setText(ci.package.isEmpty()    ? "-" : ci.package);
@@ -1495,4 +1529,122 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
 
     bufferSegments = std::move(coalesced);
     updateLegendTable();
+}
+
+void MainWindow::applyLanguage(const QString &langCode, bool saveSetting) {
+    QString normalized = langCode.trimmed().toLower();
+    if (normalized != QLatin1String("en") && normalized != QLatin1String("ja")) {
+        normalized = QStringLiteral("auto");
+    }
+    currentLangCode_ = normalized;
+
+    if (saveSetting) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/language"), currentLangCode_);
+    }
+
+    if (qtTranslator_) {
+        qApp->removeTranslator(qtTranslator_);
+        delete qtTranslator_;
+        qtTranslator_ = nullptr;
+    }
+    if (appTranslator_) {
+        qApp->removeTranslator(appTranslator_);
+        delete appTranslator_;
+        appTranslator_ = nullptr;
+    }
+
+    if (currentLangCode_ != QLatin1String("en")) {
+        const QLocale targetLocale = (currentLangCode_ == QLatin1String("auto"))
+            ? QLocale::system()
+            : QLocale(currentLangCode_);
+
+        auto *qtTr = new QTranslator(this);
+        if (qtTr->load(targetLocale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                       QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+            qApp->installTranslator(qtTr);
+            qtTranslator_ = qtTr;
+        } else {
+            delete qtTr;
+        }
+
+        auto *appTr = new QTranslator(this);
+        if (appTr->load(targetLocale, QStringLiteral("fireminipro"), QStringLiteral("_"),
+                        QStringLiteral(":/i18n"))) {
+            qApp->installTranslator(appTr);
+            appTranslator_ = appTr;
+        } else {
+            delete appTr;
+        }
+    }
+}
+
+void MainWindow::retranslateUi() {
+    setWindowTitle(tr("FireMinipro - An Open Source GUI for minipro CLI tool %1")
+                   .arg(QStringLiteral(FIREMINIPRO_VERSION)));
+
+    if (menuApp_)      menuApp_->setTitle(tr("&FireMinipro"));
+    if (actAbout_)     actAbout_->setText(tr("&About FireMinipro…"));
+    if (actQuit_)      actQuit_->setText(tr("&Quit"));
+    if (menuLanguage_) menuLanguage_->setTitle(tr("&Language"));
+    if (actLangAuto_)  actLangAuto_->setText(tr("System Default"));
+
+    if (groupTargets_) groupTargets_->setTitle(tr("Target"));
+    if (lblProg_)      lblProg_->setText(tr("Programmer:"));
+    if (lblDev_)       lblDev_->setText(tr("Device:"));
+    if (btnRescan)     btnRescan->setText(tr("Rescan"));
+    if (comboProgrammer) comboProgrammer->setPlaceholderText(tr("No programmer"));
+    if (comboDevice) {
+        comboDevice->setPlaceholderText(
+            (comboProgrammer && comboProgrammer->count() > 0 && comboDevice->count() == 0)
+            ? tr("No devices for this programmer")
+            : tr("No devices"));
+    }
+
+    if (groupChipInfo_)   groupChipInfo_->setTitle(tr("Chip information"));
+    if (lblChipKeyName_)  lblChipKeyName_->setText(tr("Name:"));
+    if (lblChipKeyPkg_)   lblChipKeyPkg_->setText(tr("Package:"));
+    if (lblChipKeyMem_)   lblChipKeyMem_->setText(tr("Memory:"));
+    if (lblChipKeyWidth_) lblChipKeyWidth_->setText(tr("Mem width:"));
+    if (lblChipKeyProto_) lblChipKeyProto_->setText(tr("Protocol:"));
+    updateChipInfo(lastChipInfo_);
+
+    if (groupBuffer_)     groupBuffer_->setTitle(tr("Buffer"));
+    if (btnLoadBinary)    btnLoadBinary->setText(tr("Load file to buffer"));
+    if (btnLoadAdvanced)  btnLoadAdvanced->setText(tr("Advanced load…"));
+    if (btnClear)         btnClear->setText(tr("Clear buffer"));
+    if (btnSave)          btnSave->setText(tr("Save buffer"));
+    if (btnRead)          btnRead->setText(tr("Read from target"));
+    if (btnWrite)         btnWrite->setText(tr("Write to target"));
+    if (chkAsciiSwap)     chkAsciiSwap->setText(tr("ASCII byteswap (16-bit)"));
+    if (lblBufSize) {
+        if (buffer_.isEmpty()) {
+            lblBufSize->setText(tr("Size: 0 (0x0)"));
+        } else {
+            lblBufSize->setText(tr("Size: %1 (0x%2)")
+                                .arg(QLocale().toString(buffer_.size()))
+                                .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+        }
+    }
+    if (progReadWrite && !processBusy_) {
+        progReadWrite->setFormat(tr("Idle"));
+    }
+
+    if (groupDevOps_)     groupDevOps_->setTitle(tr("Device operations"));
+    if (btnBlankCheck)    btnBlankCheck->setText(tr("Blank check"));
+    if (btnEraseDevice)   btnEraseDevice->setText(tr("Erase device"));
+    if (btnTestLogic)     btnTestLogic->setText(tr("Test logic"));
+
+    if (groupOpts_)       groupOpts_->setTitle(tr("Device Options"));
+    if (chkSkipVerify)    chkSkipVerify->setText(tr("Skip verify"));
+    if (chkIgnoreId)      chkIgnoreId->setText(tr("Ignore ID error"));
+    if (chkSkipId)        chkSkipId->setText(tr("Skip ID check"));
+    if (chkNoSizeErr)     chkNoSizeErr->setText(tr("Ignore size error"));
+
+    if (hexModel && hexModel->columnCount() > 0) {
+        emit hexModel->headerDataChanged(Qt::Horizontal, 0, hexModel->columnCount() - 1);
+    }
+    if (segmentModel && segmentModel->columnCount() > 0) {
+        emit segmentModel->headerDataChanged(Qt::Horizontal, 0, segmentModel->columnCount() - 1);
+    }
 }
