@@ -130,9 +130,71 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(actLangEn_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("en"),   true); retranslateUi(); });
     connect(actLangJa_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("ja"),   true); retranslateUi(); });
 
+    // Theme menu
+    menuTheme_ = mb->addMenu(tr("&Theme"));
+    auto *themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+
+    actThemeFamicom_ = new QAction(tr("Famicom / NES (Red & Cream)"), this);
+    actThemeFamicom_->setCheckable(true);
+    actThemeLight_ = new QAction(tr("Light"), this);
+    actThemeLight_->setCheckable(true);
+    actThemeGray_ = new QAction(tr("Gray"), this);
+    actThemeGray_->setCheckable(true);
+
+    for (QAction *a : {actThemeFamicom_, actThemeLight_, actThemeGray_}) {
+        themeGroup->addAction(a);
+        menuTheme_->addAction(a);
+    }
+    connect(actThemeFamicom_, &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("famicom"), true); });
+    connect(actThemeLight_,   &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("light"),   true); });
+    connect(actThemeGray_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("gray"),    true); });
+
     // Left column
     auto *leftBox = new QWidget(central);
     auto *leftLayout = new QVBoxLayout(leftBox);
+
+    QFont small = this->font();
+    small.setPointSizeF(this->font().pointSizeF() - 1);
+
+    // Compact in-window Display Settings (Language + Theme) so macOS users can switch directly in-window
+    groupAppearance_ = new QGroupBox(leftBox);
+    auto *gridApp = new QGridLayout(groupAppearance_);
+    lblUiLang_  = new QLabel(groupAppearance_);
+    lblUiTheme_ = new QLabel(groupAppearance_);
+    lblUiLang_->setFont(small);
+    lblUiTheme_->setFont(small);
+    comboUiLang_  = new QComboBox(groupAppearance_);
+    comboUiTheme_ = new QComboBox(groupAppearance_);
+    comboUiLang_->addItem(tr("System Default"), QStringLiteral("auto"));
+    comboUiLang_->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    comboUiLang_->addItem(QStringLiteral("日本語 (Japanese)"), QStringLiteral("ja"));
+    comboUiTheme_->addItem(tr("Famicom / NES"), QStringLiteral("famicom"));
+    comboUiTheme_->addItem(tr("Light"), QStringLiteral("light"));
+    comboUiTheme_->addItem(tr("Gray"), QStringLiteral("gray"));
+    gridApp->addWidget(lblUiLang_,   0, 0);
+    gridApp->addWidget(comboUiLang_, 0, 1);
+    gridApp->addWidget(lblUiTheme_,  0, 2);
+    gridApp->addWidget(comboUiTheme_,0, 3);
+    gridApp->setColumnStretch(1, 1);
+    gridApp->setColumnStretch(3, 1);
+    gridApp->setHorizontalSpacing(6);
+    groupAppearance_->setLayout(gridApp);
+    leftLayout->addWidget(groupAppearance_);
+
+    connect(comboUiLang_, &QComboBox::currentIndexChanged, this, [this](int idx){
+        if (idx < 0) return;
+        const QString code = comboUiLang_->itemData(idx).toString();
+        if (code == currentLangCode_) return;
+        applyLanguage(code, true);
+        retranslateUi();
+    });
+    connect(comboUiTheme_, &QComboBox::currentIndexChanged, this, [this](int idx){
+        if (idx < 0) return;
+        const QString code = comboUiTheme_->itemData(idx).toString();
+        if (code == currentThemeCode_) return;
+        applyTheme(code, true);
+    });
 
     // Target group
     groupTargets_ = new QGroupBox(leftBox);
@@ -142,8 +204,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboProgrammer = new QComboBox(groupTargets_);
     comboDevice = new QComboBox(groupTargets_);
     btnRescan = new QPushButton(groupTargets_);
-    QFont small = this->font();
-    small.setPointSizeF(this->font().pointSizeF() - 1);
     lblProg_->setFont(small);
     lblDev_->setFont(small);
 
@@ -622,6 +682,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // initial state
     setUiEnabled(true);
     updateActionEnabling();
+    {
+        QSettings settings;
+        const QString savedTheme = settings.value(QStringLiteral("ui/theme"), QStringLiteral("famicom")).toString();
+        applyTheme(savedTheme, false);
+    }
     retranslateUi();
 }
 
@@ -1577,17 +1642,304 @@ void MainWindow::applyLanguage(const QString &langCode, bool saveSetting) {
             delete appTr;
         }
     }
+
+    if (actLangAuto_) actLangAuto_->setChecked(currentLangCode_ == QLatin1String("auto"));
+    if (actLangEn_)   actLangEn_->setChecked(currentLangCode_ == QLatin1String("en"));
+    if (actLangJa_)   actLangJa_->setChecked(currentLangCode_ == QLatin1String("ja"));
+    if (comboUiLang_) {
+        QSignalBlocker block(comboUiLang_);
+        const int idx = comboUiLang_->findData(currentLangCode_);
+        if (idx >= 0) comboUiLang_->setCurrentIndex(idx);
+    }
+}
+
+void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
+    QString normalized = themeCode.trimmed().toLower();
+    if (normalized != QLatin1String("light") && normalized != QLatin1String("gray")) {
+        normalized = QStringLiteral("famicom");
+    }
+    currentThemeCode_ = normalized;
+
+    if (saveSetting) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/theme"), currentThemeCode_);
+    }
+
+    if (actThemeFamicom_) actThemeFamicom_->setChecked(currentThemeCode_ == QLatin1String("famicom"));
+    if (actThemeLight_)   actThemeLight_->setChecked(currentThemeCode_ == QLatin1String("light"));
+    if (actThemeGray_)    actThemeGray_->setChecked(currentThemeCode_ == QLatin1String("gray"));
+    if (comboUiTheme_) {
+        QSignalBlocker block(comboUiTheme_);
+        const int idx = comboUiTheme_->findData(currentThemeCode_);
+        if (idx >= 0) comboUiTheme_->setCurrentIndex(idx);
+    }
+
+    QString qss;
+    if (currentThemeCode_ == QLatin1String("famicom")) {
+        // Famicom / NES inspired: slightly warm yellowish-cream white + Famicom crimson red + gold trim
+        qss = QStringLiteral(R"(
+            QMainWindow, QDialog { background: #F2EBD5; color: #2B1B17; }
+            QWidget { color: #2B1B17; }
+            QGroupBox {
+                background: #FAF5E4;
+                border: 2px solid #D5C8A3;
+                border-radius: 7px;
+                margin-top: 12px;
+                padding-top: 8px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px;
+                color: #9E1B22;
+                background: #FAF5E4;
+            }
+            QPushButton {
+                background: #EDE3C6;
+                color: #2B1B17;
+                border: 1.5px solid #B8A67D;
+                border-radius: 5px;
+                padding: 5px 10px;
+                font-weight: 600;
+            }
+            QPushButton:hover:enabled {
+                background: #A61C24;
+                color: #FFF9EB;
+                border-color: #7D1218;
+            }
+            QPushButton:pressed:enabled { background: #7D1218; color: #FFF9EB; }
+            QPushButton:disabled { background: #E9E2CE; color: #9C8E75; border-color: #D5CBB1; }
+            QPushButton#btnWritePrimary, QDialogButtonBox QPushButton:default {
+                background: #A61C24;
+                color: #FFF9EB;
+                border: 1.5px solid #C59B38;
+            }
+            QComboBox, QLineEdit {
+                background: #FFFDF7;
+                color: #2B1B17;
+                border: 1.5px solid #C6B792;
+                border-radius: 4px;
+                padding: 4px 6px;
+                selection-background-color: #A61C24;
+                selection-color: #FFF9EB;
+            }
+            QComboBox QAbstractItemView {
+                background: #FFFDF7;
+                color: #2B1B17;
+                selection-background-color: #A61C24;
+                selection-color: #FFF9EB;
+            }
+            QTableView, QPlainTextEdit {
+                background: #FFFDF7;
+                alternate-background-color: #F4EDE0;
+                color: #2B1B17;
+                border: 1.5px solid #C6B792;
+                border-radius: 4px;
+                selection-background-color: #A61C24;
+                selection-color: #FFF9EB;
+                gridline-color: #E5DAC0;
+            }
+            QHeaderView::section {
+                background: #A61C24;
+                color: #FFF8E7;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #C59B38;
+                font-weight: bold;
+            }
+            QProgressBar {
+                background: #E8DFC5;
+                color: #2B1B17;
+                border: 1.5px solid #B8A67D;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #9E1B22, stop:1 #C92A33);
+                border-radius: 3px;
+            }
+            QCheckBox::indicator { width: 15px; height: 15px; border: 1.5px solid #9E1B22; border-radius: 3px; background: #FFFDF7; }
+            QCheckBox::indicator:checked { background: #A61C24; border-color: #7D1218; }
+        )");
+    } else if (currentThemeCode_ == QLatin1String("light")) {
+        qss = QStringLiteral(R"(
+            QMainWindow, QDialog { background: #F3F5F8; color: #1E293B; }
+            QWidget { color: #1E293B; }
+            QGroupBox {
+                background: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 7px;
+                margin-top: 12px;
+                padding-top: 8px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px;
+                color: #1D4ED8;
+                background: #FFFFFF;
+            }
+            QPushButton {
+                background: #F1F5F9;
+                color: #1E293B;
+                border: 1px solid #CBD5E1;
+                border-radius: 5px;
+                padding: 5px 10px;
+                font-weight: 600;
+            }
+            QPushButton:hover:enabled { background: #2563EB; color: #FFFFFF; border-color: #1D4ED8; }
+            QPushButton:disabled { background: #F8FAFC; color: #94A3B8; border-color: #E2E8F0; }
+            QComboBox, QLineEdit {
+                background: #FFFFFF;
+                color: #1E293B;
+                border: 1px solid #CBD5E1;
+                border-radius: 4px;
+                padding: 4px 6px;
+                selection-background-color: #2563EB;
+                selection-color: #FFFFFF;
+            }
+            QTableView, QPlainTextEdit {
+                background: #FFFFFF;
+                alternate-background-color: #F8FAFC;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 4px;
+                selection-background-color: #2563EB;
+                selection-color: #FFFFFF;
+                gridline-color: #E2E8F0;
+            }
+            QHeaderView::section {
+                background: #E2E8F0;
+                color: #1E293B;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #CBD5E1;
+                font-weight: bold;
+            }
+            QProgressBar {
+                background: #E2E8F0;
+                color: #0F172A;
+                border: 1px solid #CBD5E1;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk { background: #2563EB; border-radius: 3px; }
+        )");
+    } else {
+        // Gray theme
+        qss = QStringLiteral(R"(
+            QMainWindow, QDialog { background: #25282E; color: #E5E7EB; }
+            QWidget { color: #E5E7EB; }
+            QGroupBox {
+                background: #2F333B;
+                border: 1px solid #454C59;
+                border-radius: 7px;
+                margin-top: 12px;
+                padding-top: 8px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px;
+                color: #93C5FD;
+                background: #2F333B;
+            }
+            QPushButton {
+                background: #3B404A;
+                color: #F3F4F6;
+                border: 1px solid #525866;
+                border-radius: 5px;
+                padding: 5px 10px;
+                font-weight: 600;
+            }
+            QPushButton:hover:enabled { background: #3B82F6; color: #FFFFFF; border-color: #2563EB; }
+            QPushButton:disabled { background: #2A2D34; color: #6B7280; border-color: #373B44; }
+            QComboBox, QLineEdit {
+                background: #1E2126;
+                color: #F3F4F6;
+                border: 1px solid #4B5260;
+                border-radius: 4px;
+                padding: 4px 6px;
+                selection-background-color: #3B82F6;
+                selection-color: #FFFFFF;
+            }
+            QComboBox QAbstractItemView {
+                background: #1E2126;
+                color: #F3F4F6;
+                selection-background-color: #3B82F6;
+                selection-color: #FFFFFF;
+            }
+            QTableView, QPlainTextEdit {
+                background: #1B1E23;
+                alternate-background-color: #23272E;
+                color: #E5E7EB;
+                border: 1px solid #454C59;
+                border-radius: 4px;
+                selection-background-color: #3B82F6;
+                selection-color: #FFFFFF;
+                gridline-color: #2E3440;
+            }
+            QHeaderView::section {
+                background: #383D47;
+                color: #E5E7EB;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #4B5260;
+                font-weight: bold;
+            }
+            QProgressBar {
+                background: #1E2126;
+                color: #F3F4F6;
+                border: 1px solid #4B5260;
+                border-radius: 5px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk { background: #3B82F6; border-radius: 3px; }
+        )");
+    }
+    qApp->setStyleSheet(qss);
 }
 
 void MainWindow::retranslateUi() {
     setWindowTitle(tr("FireMinipro - An Open Source GUI for minipro CLI tool %1")
                    .arg(QStringLiteral(FIREMINIPRO_VERSION)));
 
-    if (menuApp_)      menuApp_->setTitle(tr("&FireMinipro"));
-    if (actAbout_)     actAbout_->setText(tr("&About FireMinipro…"));
-    if (actQuit_)      actQuit_->setText(tr("&Quit"));
-    if (menuLanguage_) menuLanguage_->setTitle(tr("&Language"));
-    if (actLangAuto_)  actLangAuto_->setText(tr("System Default"));
+    if (menuApp_)        menuApp_->setTitle(tr("&FireMinipro"));
+    if (actAbout_)       actAbout_->setText(tr("&About FireMinipro…"));
+    if (actQuit_)        actQuit_->setText(tr("&Quit"));
+    if (menuLanguage_)   menuLanguage_->setTitle(tr("&Language"));
+    if (actLangAuto_)    actLangAuto_->setText(tr("System Default"));
+    if (menuTheme_)      menuTheme_->setTitle(tr("&Theme"));
+    if (actThemeFamicom_) actThemeFamicom_->setText(tr("Famicom / NES (Red & Cream)"));
+    if (actThemeLight_)  actThemeLight_->setText(tr("Light"));
+    if (actThemeGray_)   actThemeGray_->setText(tr("Gray"));
+
+    if (groupAppearance_) groupAppearance_->setTitle(tr("Display"));
+    if (lblUiLang_)       lblUiLang_->setText(tr("Language:"));
+    if (lblUiTheme_)      lblUiTheme_->setText(tr("Theme:"));
+    if (comboUiLang_) {
+        QSignalBlocker block(comboUiLang_);
+        const int idx = comboUiLang_->findData(QStringLiteral("auto"));
+        if (idx >= 0) comboUiLang_->setItemText(idx, tr("System Default"));
+    }
+    if (comboUiTheme_) {
+        QSignalBlocker block(comboUiTheme_);
+        if (const int i = comboUiTheme_->findData(QStringLiteral("famicom")); i >= 0)
+            comboUiTheme_->setItemText(i, tr("Famicom / NES"));
+        if (const int i = comboUiTheme_->findData(QStringLiteral("light")); i >= 0)
+            comboUiTheme_->setItemText(i, tr("Light"));
+        if (const int i = comboUiTheme_->findData(QStringLiteral("gray")); i >= 0)
+            comboUiTheme_->setItemText(i, tr("Gray"));
+    }
 
     if (groupTargets_) groupTargets_->setTitle(tr("Target"));
     if (lblProg_)      lblProg_->setText(tr("Programmer:"));

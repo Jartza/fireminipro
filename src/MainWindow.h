@@ -53,13 +53,23 @@ private:
     QAction     *actLangAuto_{};
     QAction     *actLangEn_{};
     QAction     *actLangJa_{};
+    QMenu       *menuTheme_{};
+    QAction     *actThemeFamicom_{};
+    QAction     *actThemeLight_{};
+    QAction     *actThemeGray_{};
     QTranslator *qtTranslator_{};
     QTranslator *appTranslator_{};
     QString      currentLangCode_{QStringLiteral("auto")};
+    QString      currentThemeCode_{QStringLiteral("famicom")};
     bool         processBusy_{false};
     ProcessHandling::ChipInfo lastChipInfo_{};
 
     // Group boxes & labels for retranslation
+    QGroupBox   *groupAppearance_{};
+    QLabel      *lblUiLang_{};
+    QLabel      *lblUiTheme_{};
+    QComboBox   *comboUiLang_{};
+    QComboBox   *comboUiTheme_{};
     QGroupBox   *groupTargets_{};
     QLabel      *lblProg_{};
     QLabel      *lblDev_{};
@@ -161,6 +171,7 @@ private:
     void updateChipInfo(const ProcessHandling::ChipInfo &ci);
     void clearChipInfo();
     void applyLanguage(const QString &langCode, bool saveSetting);
+    void applyTheme(const QString &themeCode, bool saveSetting);
     void retranslateUi();
     QString exportBufferToTempFileLocal(const QString& baseName);
 
