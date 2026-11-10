@@ -14,6 +14,10 @@ class QPlainTextEdit;
 class QCheckBox;
 class QLabel;
 class QWidget;
+class QGroupBox;
+class QMenu;
+class QAction;
+class QTranslator;
 class HexView;
 class QProgressBar;
 class SegmentView;
@@ -41,6 +45,44 @@ private slots:
                      const QString &filters = QString());
 
 private:
+    // Menus & i18n
+    QMenu       *menuApp_{};
+    QAction     *actAbout_{};
+    QAction     *actPreferences_{};
+    QAction     *actQuit_{};
+    QMenu       *menuLanguage_{};
+    QAction     *actLangAuto_{};
+    QAction     *actLangEn_{};
+    QAction     *actLangJa_{};
+    QMenu       *menuTheme_{};
+    QAction     *actThemeFamicom_{};
+    QAction     *actThemeNes_{};
+    QAction     *actThemeLight_{};
+    QAction     *actThemeGray_{};
+    QAction     *actThemeDark_{};
+    QAction     *actOpenSettings_{};
+    QTranslator *qtTranslator_{};
+    QTranslator *appTranslator_{};
+    QString      currentLangCode_{QStringLiteral("auto")};
+    QString      currentThemeCode_{QStringLiteral("famicom")};
+    bool         processBusy_{false};
+    ProcessHandling::ChipInfo lastChipInfo_{};
+
+    // Group boxes & labels for retranslation
+    QPushButton *btnSettings_{};
+    QGroupBox   *groupTargets_{};
+    QLabel      *lblProg_{};
+    QLabel      *lblDev_{};
+    QGroupBox   *groupChipInfo_{};
+    QLabel      *lblChipKeyName_{};
+    QLabel      *lblChipKeyPkg_{};
+    QLabel      *lblChipKeyMem_{};
+    QLabel      *lblChipKeyWidth_{};
+    QLabel      *lblChipKeyProto_{};
+    QGroupBox   *groupBuffer_{};
+    QGroupBox   *groupDevOps_{};
+    QGroupBox   *groupOpts_{};
+
     // Target and device
     QComboBox   *comboProgrammer{};
     QComboBox   *comboDevice{};
@@ -128,6 +170,10 @@ private:
     void updateActionEnabling();
     void updateChipInfo(const ProcessHandling::ChipInfo &ci);
     void clearChipInfo();
+    void applyLanguage(const QString &langCode, bool saveSetting);
+    void applyTheme(const QString &themeCode, bool saveSetting);
+    void openSettingsDialog();
+    void retranslateUi();
     QString exportBufferToTempFileLocal(const QString& baseName);
 
     // parsing / buffer helpers

@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QPlainTextEdit>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QPushButton>
 #include <QSplitter>
@@ -13,6 +14,10 @@
 #include <QAbstractItemView>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
+#include <QLibraryInfo>
+#include <QSettings>
+#include <QTranslator>
 #include <QVBoxLayout>
 #include <QCheckBox>
 #include <QHeaderView>
@@ -54,34 +59,38 @@
 #include "LoadPreviewBar.h"
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
-    // The constructor builds the entire UI programmatically.
-    // This avoids the need for .ui files and Qt Designer.
+    // Load preferred UI language before building translated widgets.
+    {
+        QSettings settings;
+        const QString envLang = qEnvironmentVariable("FIREMINIPRO_LANG").trimmed();
+        const QString initialLang = envLang.isEmpty()
+            ? settings.value(QStringLiteral("ui/language"), QStringLiteral("auto")).toString()
+            : envLang;
+        applyLanguage(initialLang, false);
+    }
 
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool " FIREMINIPRO_VERSION);
-    this->setMinimumSize(1050,768);
+    this->setMinimumSize(1060, 740);
+    this->resize(1160, 840);
 
     // Menu bar
     auto *mb = menuBar();
 
     // App menu (macOS will merge this into the app menu automatically)
-    auto *menuApp = mb->addMenu(tr("&FireMinipro"));
+    menuApp_ = mb->addMenu(tr("&FireMinipro"));
 
-    auto *actAbout = new QAction(tr("&About FireMinipro…"), this);
-    actAbout->setMenuRole(QAction::AboutRole); // macOS-native placement
-    connect(actAbout, &QAction::triggered, this, [this]{
+    actAbout_ = new QAction(tr("&About FireMinipro…"), this);
+    actAbout_->setMenuRole(QAction::AboutRole); // macOS-native placement
+    connect(actAbout_, &QAction::triggered, this, [this]{
         const QString ver = QStringLiteral(FIREMINIPRO_VERSION);
         const QString qt  = QString::fromLatin1(qVersion());
 
-        QString html =
-            "<b>FireMinipro</b><br>"
-            "Version: " + ver + "<br>"
-            "Qt: " + qt + "<br><br>"
-            "A fast, buffer-first GUI for minipro.<br>"
-            "<small>© 2025 Jari Tulilahti / Firebay refurb.<br>"
-            "MIT License.</small>";
+        QString html = QStringLiteral("<b>FireMinipro</b><br>%1 %2<br>%3 %4<br><br>%5<br><small>© 2025 Jari Tulilahti / Firebay refurb.<br>%6</small>")
+            .arg(tr("Version:"), ver, tr("Qt:"), qt,
+                 tr("A fast, buffer-first GUI for minipro."),
+                 tr("MIT License."));
 
         QMessageBox box(this);
         box.setWindowTitle(tr("About FireMinipro"));
@@ -90,35 +99,106 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         box.setIconPixmap(QPixmap(":/appicon.png").scaled(96,96, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         box.exec();
     });
-    menuApp->addAction(actAbout);
-    menuApp->addSeparator();
+    menuApp_->addAction(actAbout_);
 
-    auto *actQuit = new QAction(tr("&Quit"), this);
-    actQuit->setShortcuts(QKeySequence::Quit);
-    actQuit->setMenuRole(QAction::QuitRole);
-    connect(actQuit, &QAction::triggered, qApp, &QCoreApplication::quit);
-    menuApp->addAction(actQuit);
+    actPreferences_ = new QAction(tr("&Settings…"), this);
+    actPreferences_->setShortcuts(QKeySequence::Preferences);
+    actPreferences_->setMenuRole(QAction::PreferencesRole);
+    connect(actPreferences_, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    menuApp_->addAction(actPreferences_);
+    menuApp_->addSeparator();
 
-    // Left column
-    auto *leftBox = new QWidget(central);
+    actQuit_ = new QAction(tr("&Quit"), this);
+    actQuit_->setShortcuts(QKeySequence::Quit);
+    actQuit_->setMenuRole(QAction::QuitRole);
+    connect(actQuit_, &QAction::triggered, qApp, &QCoreApplication::quit);
+    menuApp_->addAction(actQuit_);
+
+    // Language menu
+    menuLanguage_ = mb->addMenu(tr("&Language"));
+    auto *langGroup = new QActionGroup(this);
+    langGroup->setExclusive(true);
+
+    actLangAuto_ = new QAction(tr("System Default"), this);
+    actLangAuto_->setCheckable(true);
+    actLangEn_ = new QAction(QStringLiteral("English"), this);
+    actLangEn_->setCheckable(true);
+    actLangJa_ = new QAction(QStringLiteral("日本語 (Japanese)"), this);
+    actLangJa_->setCheckable(true);
+
+    for (QAction *a : {actLangAuto_, actLangEn_, actLangJa_}) {
+        langGroup->addAction(a);
+        menuLanguage_->addAction(a);
+    }
+    actLangAuto_->setChecked(currentLangCode_ == QLatin1String("auto"));
+    actLangEn_->setChecked(currentLangCode_ == QLatin1String("en"));
+    actLangJa_->setChecked(currentLangCode_ == QLatin1String("ja"));
+
+    connect(actLangAuto_, &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("auto"), true); retranslateUi(); });
+    connect(actLangEn_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("en"),   true); retranslateUi(); });
+    connect(actLangJa_,   &QAction::triggered, this, [this]{ applyLanguage(QStringLiteral("ja"),   true); retranslateUi(); });
+
+    // Theme menu
+    menuTheme_ = mb->addMenu(tr("&Theme"));
+    auto *themeGroup = new QActionGroup(this);
+    themeGroup->setExclusive(true);
+
+    actThemeFamicom_ = new QAction(tr("Famicom (Red & Cream)"), this);
+    actThemeFamicom_->setCheckable(true);
+    actThemeNes_ = new QAction(tr("NES (Gray & Red)"), this);
+    actThemeNes_->setCheckable(true);
+    actThemeLight_ = new QAction(tr("Light"), this);
+    actThemeLight_->setCheckable(true);
+    actThemeGray_ = new QAction(tr("Gray"), this);
+    actThemeGray_->setCheckable(true);
+    actThemeDark_ = new QAction(tr("Dark (Original)"), this);
+    actThemeDark_->setCheckable(true);
+
+    for (QAction *a : {actThemeFamicom_, actThemeNes_, actThemeLight_, actThemeGray_, actThemeDark_}) {
+        themeGroup->addAction(a);
+        menuTheme_->addAction(a);
+    }
+    menuTheme_->addSeparator();
+    actOpenSettings_ = new QAction(tr("Open Settings Window…"), this);
+    connect(actOpenSettings_, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    menuTheme_->addAction(actOpenSettings_);
+
+    connect(actThemeFamicom_, &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("famicom"), true); });
+    connect(actThemeNes_,     &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("nes"),     true); });
+    connect(actThemeLight_,   &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("light"),   true); });
+    connect(actThemeGray_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("gray"),    true); });
+    connect(actThemeDark_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("dark"),    true); });
+
+    // Left column inside a scroll area so controls never collapse vertically
+    auto *leftScroll = new QScrollArea(central);
+    leftScroll->setWidgetResizable(true);
+    leftScroll->setFrameShape(QFrame::NoFrame);
+    leftScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    leftScroll->setMinimumWidth(340);
+
+    auto *leftBox = new QWidget(leftScroll);
     auto *leftLayout = new QVBoxLayout(leftBox);
+    leftLayout->setContentsMargins(4, 4, 4, 4);
+    leftLayout->setSpacing(8);
+    leftScroll->setWidget(leftBox);
 
-    // Target group
-    auto *groupTargets = new QGroupBox("Target", leftBox);
-    auto *gridT = new QGridLayout(groupTargets);
-    auto *lblProg = new QLabel("Programmer:", groupTargets);
-    auto *lblDev  = new QLabel("Device:",     groupTargets);
-    comboProgrammer = new QComboBox(groupTargets);
-    comboDevice = new QComboBox(groupTargets);
-    btnRescan = new QPushButton("Rescan", groupTargets);
     QFont small = this->font();
     small.setPointSizeF(this->font().pointSizeF() - 1);
-    lblProg->setFont(small);
-    lblDev->setFont(small);
 
-    gridT->addWidget(lblProg,         0, 0);
+    // Target group
+    groupTargets_ = new QGroupBox(leftBox);
+    auto *gridT = new QGridLayout(groupTargets_);
+    lblProg_ = new QLabel(groupTargets_);
+    lblDev_  = new QLabel(groupTargets_);
+    comboProgrammer = new QComboBox(groupTargets_);
+    comboDevice = new QComboBox(groupTargets_);
+    btnRescan = new QPushButton(groupTargets_);
+    lblProg_->setFont(small);
+    lblDev_->setFont(small);
+
+    gridT->addWidget(lblProg_,        0, 0);
     gridT->addWidget(comboProgrammer, 0, 1);
-    gridT->addWidget(lblDev,          1, 0);
+    gridT->addWidget(lblDev_,         1, 0);
     gridT->addWidget(comboDevice,     1, 1, 1, 2);
     gridT->addWidget(btnRescan,       0, 2, 1, 1, Qt::AlignRight | Qt::AlignTop);
     
@@ -131,10 +211,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridT->setColumnStretch(2, 0);
     gridT->setHorizontalSpacing(4);
 
-    comboProgrammer->setPlaceholderText("No programmer");
-    comboDevice->setPlaceholderText("No devices");
-    groupTargets->setLayout(gridT);
-    leftLayout->addWidget(groupTargets);
+    groupTargets_->setLayout(gridT);
+    leftLayout->addWidget(groupTargets_);
 
     // Make device combobox searchable / filterable
     // and editable to allow custom device names,
@@ -226,55 +304,62 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
     // Chip information (between Target and Buffer)
-    auto *groupChipInfo = new QGroupBox("Chip information", leftBox);
-    auto *gridC = new QGridLayout(groupChipInfo);
+    groupChipInfo_ = new QGroupBox(leftBox);
+    auto *gridC = new QGridLayout(groupChipInfo_);
 
     // left column (keys), right column (values)
-    auto addRow = [&](int r, const char *key, QLabel *&valueOut) {
-        auto *k = new QLabel(QString::fromUtf8(key), groupChipInfo);
-        k->setFont(small);
-        k->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        valueOut = new QLabel("-", groupChipInfo);
+    auto addRow = [&](int r, QLabel *&keyOut, QLabel *&valueOut) {
+        keyOut = new QLabel(groupChipInfo_);
+        keyOut->setFont(small);
+        keyOut->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        valueOut = new QLabel("-", groupChipInfo_);
         valueOut->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        gridC->addWidget(k, r, 0);
+        gridC->addWidget(keyOut, r, 0);
         gridC->addWidget(valueOut, r, 1);
     };
 
     // rows
     int r = 0;
-    addRow(r++, "Name:",           chipName);
-    addRow(r++, "Package:",        chipPackage);
-    addRow(r++, "Memory:",         chipMemory);
-    addRow(r++, "Mem width:",      chipBusWidth);
-    addRow(r++, "Protocol:",       chipProtocol);
+    addRow(r++, lblChipKeyName_,  chipName);
+    addRow(r++, lblChipKeyPkg_,   chipPackage);
+    addRow(r++, lblChipKeyMem_,   chipMemory);
+    addRow(r++, lblChipKeyWidth_, chipBusWidth);
+    addRow(r++, lblChipKeyProto_, chipProtocol);
 
     gridC->setColumnStretch(0, 0);
     gridC->setColumnStretch(1, 1);
-    groupChipInfo->setLayout(gridC);
-    leftLayout->addWidget(groupChipInfo);
+    groupChipInfo_->setLayout(gridC);
+    leftLayout->addWidget(groupChipInfo_);
 
     // start clean
     clearChipInfo();
 
     // Buffer group
-    auto *groupBuffer = new QGroupBox("Buffer", leftBox);
-    auto *gridB  = new QGridLayout(groupBuffer);
-    btnClear     = new QPushButton("Clear buffer", groupBuffer);
-    btnSave      = new QPushButton("Save buffer", groupBuffer);
-    btnRead      = new QPushButton("Read from target",  groupBuffer);
-    btnWrite     = new QPushButton("Write to target", groupBuffer);
-    chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
-    btnLoadBinary   = new QPushButton("Load file to buffer", groupBuffer);
-    btnLoadAdvanced = new QPushButton("Advanced load…", groupBuffer);
-    progReadWrite = new QProgressBar(groupBuffer);
+    groupBuffer_ = new QGroupBox(leftBox);
+    auto *gridB  = new QGridLayout(groupBuffer_);
+    btnClear     = new QPushButton(groupBuffer_);
+    btnSave      = new QPushButton(groupBuffer_);
+    btnRead      = new QPushButton(groupBuffer_);
+    btnWrite     = new QPushButton(groupBuffer_);
+    chkAsciiSwap = new QCheckBox(groupBuffer_);
+    btnLoadBinary   = new QPushButton(groupBuffer_);
+    btnLoadAdvanced = new QPushButton(groupBuffer_);
+    progReadWrite = new QProgressBar(groupBuffer_);
+
+    btnWrite->setObjectName(QStringLiteral("btnWritePrimary"));
+    for (QPushButton *b : {btnLoadBinary, btnLoadAdvanced, btnClear, btnSave, btnRead, btnWrite}) {
+        b->setMinimumHeight(26);
+        b->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    }
 
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
-    progReadWrite->setFormat(QStringLiteral("Idle"));
+    progReadWrite->setMinimumHeight(22);
+    progReadWrite->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
-    if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
+    if (!lblBufSize)  lblBufSize  = new QLabel(groupBuffer_);
 
     gridB->addWidget(btnLoadBinary,   0, 0, 1, 1);
     gridB->addWidget(btnLoadAdvanced, 0, 1, 1, 1);
@@ -286,32 +371,36 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridB->addWidget(lblBufSize,      4, 0, 1, 2);
     gridB->addWidget(progReadWrite,   5, 0, 1, 2);
 
-    groupBuffer->setLayout(gridB);
-    leftLayout->addWidget(groupBuffer);
+    groupBuffer_->setLayout(gridB);
+    leftLayout->addWidget(groupBuffer_);
 
     // Device operations group (sits between Buffer and Options)
-    auto *groupDevOps = new QGroupBox("Device operations", leftBox);
-    auto *gridDO      = new QGridLayout(groupDevOps);
+    groupDevOps_ = new QGroupBox(leftBox);
+    auto *gridDO = new QGridLayout(groupDevOps_);
 
-    btnBlankCheck  = new QPushButton("Blank check",  groupDevOps);
-    btnEraseDevice = new QPushButton("Erase device", groupDevOps);
-    btnTestLogic   = new QPushButton("Test logic",   groupDevOps);
+    btnBlankCheck  = new QPushButton(groupDevOps_);
+    btnEraseDevice = new QPushButton(groupDevOps_);
+    btnTestLogic   = new QPushButton(groupDevOps_);
+    for (QPushButton *b : {btnBlankCheck, btnEraseDevice, btnTestLogic}) {
+        b->setMinimumHeight(26);
+        b->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    }
 
     // Layout: two columns, then one full-width
     gridDO->addWidget(btnBlankCheck,  0, 0);
     gridDO->addWidget(btnEraseDevice, 0, 1);
     gridDO->addWidget(btnTestLogic,   1, 0, 1, 2);
 
-    groupDevOps->setLayout(gridDO);
-    leftLayout->addWidget(groupDevOps);
+    groupDevOps_->setLayout(gridDO);
+    leftLayout->addWidget(groupDevOps_);
 
     // Device Options
-    auto *groupOpts  = new QGroupBox("Device Options", leftBox);
-    auto *gridO      = new QGridLayout(groupOpts);
-    chkSkipVerify    = new QCheckBox("Skip verify", groupOpts);
-    chkIgnoreId      = new QCheckBox("Ignore ID error", groupOpts);
-    chkSkipId        = new QCheckBox("Skip ID check", groupOpts);
-    chkNoSizeErr     = new QCheckBox("Ignore size error", groupOpts);
+    groupOpts_  = new QGroupBox(leftBox);
+    auto *gridO = new QGridLayout(groupOpts_);
+    chkSkipVerify = new QCheckBox(groupOpts_);
+    chkIgnoreId   = new QCheckBox(groupOpts_);
+    chkSkipId     = new QCheckBox(groupOpts_);
+    chkNoSizeErr  = new QCheckBox(groupOpts_);
 
     // layout options (2 columns)
     gridO->addWidget(chkSkipVerify,    0,0);
@@ -319,8 +408,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridO->addWidget(chkSkipId,        1,0);
     gridO->addWidget(chkNoSizeErr,     1,1);
 
-    groupOpts->setLayout(gridO);
-    leftLayout->addWidget(groupOpts);
+    groupOpts_->setLayout(gridO);
+    leftLayout->addWidget(groupOpts_);
+
+    btnSettings_ = new QPushButton(leftBox);
+    btnSettings_->setMinimumHeight(26);
+    btnSettings_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    connect(btnSettings_, &QPushButton::clicked, this, &MainWindow::openSettingsDialog);
+    leftLayout->addWidget(btnSettings_);
     leftLayout->addStretch();
 
     // right side (hex + legend + log)
@@ -406,7 +501,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     tableHex->horizontalHeader()->setStretchLastSection(true);
 
     auto *split = new QSplitter(Qt::Horizontal, central);
-    split->addWidget(leftBox);
+    split->addWidget(leftScroll);
     split->addWidget(rightSplitter);
     split->setStretchFactor(0, 0);
     split->setStretchFactor(1, 1);
@@ -420,7 +515,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         bufferSegments.clear();
         updateLegendTable();
         if (hexModel) hexModel->setBufferRef(&buffer_);
-        if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
+        if (lblBufSize)  lblBufSize->setText(tr("Size: 0 (0x0)"));
         updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
@@ -443,7 +538,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(proc, &ProcessHandling::devicesScanned, this, [this](const QStringList &names){
         if (!log) return;
         if (!names.isEmpty()) {
-            for (const auto &n : names) log->appendPlainText("[Scan] " + n);
+            for (const auto &n : names) log->appendPlainText(tr("[Scan] %1").arg(n));
         }
     });
 
@@ -456,10 +551,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(btnRescan, &QPushButton::clicked, this, [this]{
         if (!proc) return;
         comboProgrammer->clear();
-        comboProgrammer->setPlaceholderText("No programmer");
+        comboProgrammer->setPlaceholderText(tr("No programmer"));
         comboProgrammer->setEnabled(false);
         comboDevice->clear();
-        comboDevice->setPlaceholderText("No devices");
+        comboDevice->setPlaceholderText(tr("No devices"));
         comboDevice->setEnabled(false);
         proc->scanConnectedDevices();
     });
@@ -508,13 +603,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         const QString d = comboDevice->currentText().trimmed();
         if (p.isEmpty() || d.isEmpty()) return;
         if (buffer_.isEmpty()) {
-            if (log) log->appendPlainText("[Error] buffer is empty");
+            if (log) log->appendPlainText(tr("[Error] buffer is empty"));
             return;
         }
         // Export buffer to a temp file
         QString tempPath = exportBufferToTempFileLocal("fmp-write");
         if (tempPath.isEmpty()) {
-            if (log) log->appendPlainText("[Error] failed to create temp file for writing");
+            if (log) log->appendPlainText(tr("[Error] failed to create temp file for writing"));
             return;
         }
         pendingWriteTempPath_ = tempPath;
@@ -540,6 +635,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Disable UI buttons when minipro is running
     connect(proc, &ProcessHandling::started, this, [this]{
+        processBusy_ = true;
         disableBusyButtons();
         QApplication::setOverrideCursor(Qt::BusyCursor);
     });
@@ -548,12 +644,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // and that the UI is re-enabled after process completion
     connect(proc, &ProcessHandling::finished, this,
         [this](int /*exitCode*/, QProcess::ExitStatus /*status*/) {
+            processBusy_ = false;
             // Always restore UI first
             updateActionEnabling();
             QApplication::restoreOverrideCursor();
             if (progReadWrite) {
                 progReadWrite->setValue(100);
-                progReadWrite->setFormat(QStringLiteral("Idle"));
+                progReadWrite->setFormat(tr("Idle"));
                 progReadWrite->setTextVisible(true);
             }
             if (!pendingWriteTempPath_.isEmpty()) {
@@ -592,6 +689,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // initial state
     setUiEnabled(true);
     updateActionEnabling();
+    {
+        QSettings settings;
+        const QString savedTheme = settings.value(QStringLiteral("ui/theme"), QStringLiteral("famicom")).toString();
+        applyTheme(savedTheme, false);
+    }
+    retranslateUi();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *e) {
@@ -731,18 +834,19 @@ QString MainWindow::pickFile(const QString &title, QFileDialog::AcceptMode mode,
 
 void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
 {
+    lastChipInfo_ = ci;
     // graceful fallbacks for partial info
     chipName     ->setText(ci.baseName.isEmpty()   ? "-" : ci.baseName);
     chipPackage  ->setText(ci.package.isEmpty()    ? "-" : ci.package);
     if (ci.isLogic) {
         currentIsLogic_ = true;
         chipMemory  ->setText("-");  // logic ICs don’t have a byte size
-        chipBusWidth->setText(QString("Logic IC%1")
-                              .arg(ci.vectorCount > 0 ? QString(" (%1 vectors)").arg(ci.vectorCount) : QString()));
+        chipBusWidth->setText(tr("Logic IC%1")
+                              .arg(ci.vectorCount > 0 ? tr(" (%1 vectors)").arg(ci.vectorCount) : QString()));
     } else {
         currentIsLogic_ = false;
         chipMemory  ->setText(prettyBytes(ci.bytes));
-        chipBusWidth->setText(ci.wordBits > 0 ? QString("%1-bit").arg(ci.wordBits) : "-");
+        chipBusWidth->setText(ci.wordBits > 0 ? tr("%1-bit").arg(ci.wordBits) : "-");
     }
     chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
 
@@ -758,7 +862,7 @@ void MainWindow::clearChipInfo()
 }
 
 void MainWindow::saveBufferToFile() {
-    if (buffer_.isEmpty()) { log->appendPlainText("[Info] Buffer is empty"); return; }
+    if (buffer_.isEmpty()) { log->appendPlainText(tr("[Info] Buffer is empty")); return; }
 #if defined(Q_OS_MACOS)
     const QString path = pickFile(tr("Save image"),
                                   QFileDialog::AcceptSave,
@@ -771,17 +875,17 @@ void MainWindow::saveBufferToFile() {
     if (path.isEmpty()) return;
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
-        log->appendPlainText(QString("[Error] save: %1").arg(f.errorString()));
+        log->appendPlainText(tr("[Error] save: %1").arg(f.errorString()));
         return;
     }
     // Error check the write
     if (f.write(buffer_) != buffer_.size()) {
-        log->appendPlainText("[Error] save: write failed");
+        log->appendPlainText(tr("[Error] save: write failed"));
         f.close();
         return;
     }
     f.close();
-    log->appendPlainText(QString("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
+    log->appendPlainText(tr("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
     lastPath_ = QFileInfo(path).absolutePath();
 }
 
@@ -789,7 +893,7 @@ void MainWindow::saveBufferToFile() {
 QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
 {
     if (buffer_.isEmpty()) {
-        if (log) log->appendPlainText("[Write] Buffer is empty.");
+        if (log) log->appendPlainText(tr("[Write] Buffer is empty."));
         return {};
     }
 
@@ -801,18 +905,18 @@ QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
 
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
-        if (log) log->appendPlainText(QString("[Write] open temp failed: %1").arg(f.errorString()));
+        if (log) log->appendPlainText(tr("[Write] open temp failed: %1").arg(f.errorString()));
         return {};
     }
     if (f.write(buffer_) != buffer_.size()) {
-        if (log) log->appendPlainText("[Write] write temp failed.");
+        if (log) log->appendPlainText(tr("[Write] write temp failed."));
         f.close();
         f.remove();
         return {};
     }
     f.close();
 
-    if (log) log->appendPlainText(QString("[Write] Exported buffer to %1").arg(path));
+    if (log) log->appendPlainText(tr("[Write] Exported buffer to %1").arg(path));
     return path;
 }
 
@@ -876,8 +980,8 @@ void MainWindow::onDevicesScanned(const QStringList &names)
     comboProgrammer->clear();
 
     if (names.isEmpty()) {
-        comboProgrammer->setPlaceholderText("No programmer");
-        if (log) log->appendPlainText("[Error] No programmer found.");
+        comboProgrammer->setPlaceholderText(tr("No programmer"));
+        if (log) log->appendPlainText(tr("[Error] No programmer found."));
         // (Optional) disable actions that need a programmer here
         return;
     }
@@ -885,7 +989,7 @@ void MainWindow::onDevicesScanned(const QStringList &names)
     comboProgrammer->addItems(names);
     comboProgrammer->setCurrentIndex(0);
     comboProgrammer->setEnabled(true);
-    if (log) log->appendPlainText(QString("[Info] Found %1 programmer(s).").arg(names.size()));
+    if (log) log->appendPlainText(tr("[Info] Found %1 programmer(s).").arg(names.size()));
 }
 
 void MainWindow::onDevicesListed(const QStringList &names)
@@ -894,9 +998,9 @@ void MainWindow::onDevicesListed(const QStringList &names)
     comboDevice->clear();
 
     if (names.isEmpty()) {
-        comboDevice->setPlaceholderText("No devices for this programmer");
+        comboDevice->setPlaceholderText(tr("No devices for this programmer"));
         comboDevice->setEnabled(false);
-        if (log) log->appendPlainText("[Error] No devices found for selected programmer.");
+        if (log) log->appendPlainText(tr("[Error] No devices found for selected programmer."));
         return;
     }
 
@@ -906,7 +1010,7 @@ void MainWindow::onDevicesListed(const QStringList &names)
     comboDevice->setCurrentIndex(-1);
     comboDevice->setEnabled(true);
 
-    if (log) log->appendPlainText(QString("[Info] Loaded %1 devices.").arg(sorted.size()));
+    if (log) log->appendPlainText(tr("[Info] Loaded %1 devices.").arg(sorted.size()));
 }
 
 // Load file to buffer at user-specified offset, with optional padding
@@ -917,7 +1021,7 @@ void MainWindow::loadFileAppendDialog() {
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
-        if (log) log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        if (log) log->appendPlainText(tr("[Error] open: %1").arg(f.errorString()));
         return;
     }
 
@@ -935,13 +1039,13 @@ void MainWindow::loadFileAppendDialog() {
 
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
 
     if (log) {
-        log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+        log->appendPlainText(tr("[Loaded] %1 bytes at 0x%2 from %3")
                              .arg(QLocale().toString(len))
                              .arg(QString::number(start, 16).toUpper())
                              .arg(QFileInfo(path).fileName()));
@@ -980,7 +1084,7 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
-        log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        log->appendPlainText(tr("[Error] open: %1").arg(f.errorString()));
         return;
     }
     const QByteArray file = f.readAll();
@@ -1066,21 +1170,21 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         const qulonglong effLen = haveLen ? lenReq : fileSize;
         // Offset info (bold heading)
         if (offOk) {
-            lblOffInfo->setText(QString("<b>Offset:</b> 0x%1 (%2)")
+            lblOffInfo->setText(tr("<b>Offset:</b> 0x%1 (%2)")
                                 .arg(QString::number(off, 16).toUpper())
                                 .arg(QLocale().toString(off)));
         } else {
-            lblOffInfo->setText(QString("<b>Offset:</b> <span style='color:#c00'>invalid</span>"));
+            lblOffInfo->setText(tr("<b>Offset:</b> <span style='color:#c00'>invalid</span>"));
         }
         // Length + File info (bold headings, multiline)
         if (haveLen) {
-            lblLenInfo->setText(QString("<b>Length:</b> 0x%1 (%2)<br/><b>File size:</b> 0x%3 (%4)")
+            lblLenInfo->setText(tr("<b>Length:</b> 0x%1 (%2)<br/><b>File size:</b> 0x%3 (%4)")
                                 .arg(QString::number(lenReq, 16).toUpper())
                                 .arg(QLocale().toString(lenReq))
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         } else {
-            lblLenInfo->setText(QString("<b>Length:</b> whole file<br/><b>File size:</b> 0x%1 (%2)")
+            lblLenInfo->setText(tr("<b>Length:</b> whole file<br/><b>File size:</b> 0x%1 (%2)")
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         }
@@ -1088,7 +1192,7 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         if (offOk && effLen > 0) {
             const qulonglong endAddr = off + effLen - 1;
             const qulonglong newSizeIfAppend = std::max<qulonglong>(buffer_.size(), off + effLen);
-            lblEndInfo->setText(QString("<b>End address:</b> 0x%1 (%2)<br/><b>New buffer size:</b> 0x%3 (%4)")
+            lblEndInfo->setText(tr("<b>End address:</b> 0x%1 (%2)<br/><b>New buffer size:</b> 0x%3 (%4)")
                                 .arg(QString::number(endAddr, 16).toUpper())
                                 .arg(QLocale().toString(endAddr))
                                 .arg(QString::number(newSizeIfAppend, 16).toUpper())
@@ -1129,12 +1233,12 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
 
     // Parse final values
     qulonglong off=0, len=0, pad=0xFF;
-    if (!parseSizeLike(editOff->text(), off)) { log->appendPlainText("[Error] invalid offset"); return; }
+    if (!parseSizeLike(editOff->text(), off)) { log->appendPlainText(tr("[Error] invalid offset")); return; }
     if (!editLen->text().trimmed().isEmpty() && !parseSizeLike(editLen->text(), len)) {
-        log->appendPlainText("[Error] invalid length"); return;
+        log->appendPlainText(tr("[Error] invalid length")); return;
     }
     if (!parseSizeLike(editPad->text(), pad) || pad > 0xFF) {
-        log->appendPlainText("[Error] invalid pad"); return;
+        log->appendPlainText(tr("[Error] invalid pad")); return;
     }
 
     // Determine effective length: default to full file if length omitted/invalid
@@ -1160,19 +1264,19 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         if (prePadLen > 0)  parts << tr("pre:%1").arg(QLocale().toString(prePadLen));
         if (postPadLen > 0) parts << tr("post:%1").arg(QLocale().toString(postPadLen));
         const QString padByteText = QString::number(pad & 0xFF, 16).toUpper().rightJustified(2, QLatin1Char('0'));
-        displayName += QString(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
+        displayName += tr(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
     }
     addSegmentAndRefresh(off, effLen, displayName);
     if (!deleteOnFinish)
         lastPath_ = QFileInfo(path).absolutePath();
 
-    log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+    log->appendPlainText(tr("[Loaded] %1 bytes at 0x%2 from %3")
                          .arg(QLocale().toString(effLen))
                          .arg(QString::number(off, 16).toUpper())
                          .arg(QFileInfo(path).fileName()));
 
     if (lblBufSize)
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
 
@@ -1329,7 +1433,7 @@ void MainWindow::onLegendFilesDropped(int row, const QList<QUrl> &urls) {
     }
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
@@ -1401,7 +1505,7 @@ void MainWindow::deleteSegmentAt(int row) {
     }
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
@@ -1466,17 +1570,17 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
         if (hasLeftRemainder || hasRightRemainder) anyPartialOverlap = true;
 
         if (hasLeftRemainder)
-            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, QStringLiteral(" (partial)") , seg.id });
+            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, tr(" (partial)") , seg.id });
 
         // middle overlapped portion is dropped
 
         if (hasRightRemainder)
-            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, QStringLiteral(" (partial)") , seg.id });
+            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, tr(" (partial)") , seg.id });
     }
 
     const qulonglong thisInsertId = nextSegmentId_++;
     out.append(BufferSegment{ nBeg, length, label,
-                              anyPartialOverlap ? QStringLiteral(" (overlap)") : QString(),
+                              anyPartialOverlap ? tr(" (overlap)") : QString(),
                               thisInsertId });
 
     std::sort(out.begin(), out.end(),
@@ -1497,4 +1601,643 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
 
     bufferSegments = std::move(coalesced);
     updateLegendTable();
+}
+
+void MainWindow::applyLanguage(const QString &langCode, bool saveSetting) {
+    QString normalized = langCode.trimmed().toLower();
+    if (normalized != QLatin1String("en") && normalized != QLatin1String("ja")) {
+        normalized = QStringLiteral("auto");
+    }
+    currentLangCode_ = normalized;
+
+    if (saveSetting) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/language"), currentLangCode_);
+    }
+
+    if (qtTranslator_) {
+        qApp->removeTranslator(qtTranslator_);
+        delete qtTranslator_;
+        qtTranslator_ = nullptr;
+    }
+    if (appTranslator_) {
+        qApp->removeTranslator(appTranslator_);
+        delete appTranslator_;
+        appTranslator_ = nullptr;
+    }
+
+    if (currentLangCode_ != QLatin1String("en")) {
+        const QLocale targetLocale = (currentLangCode_ == QLatin1String("auto"))
+            ? QLocale::system()
+            : QLocale(currentLangCode_);
+
+        auto *qtTr = new QTranslator(this);
+        if (qtTr->load(targetLocale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                       QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+            qApp->installTranslator(qtTr);
+            qtTranslator_ = qtTr;
+        } else {
+            delete qtTr;
+        }
+
+        auto *appTr = new QTranslator(this);
+        if (appTr->load(targetLocale, QStringLiteral("fireminipro"), QStringLiteral("_"),
+                        QStringLiteral(":/i18n"))) {
+            qApp->installTranslator(appTr);
+            appTranslator_ = appTr;
+        } else {
+            delete appTr;
+        }
+    }
+
+    if (actLangAuto_) actLangAuto_->setChecked(currentLangCode_ == QLatin1String("auto"));
+    if (actLangEn_)   actLangEn_->setChecked(currentLangCode_ == QLatin1String("en"));
+    if (actLangJa_)   actLangJa_->setChecked(currentLangCode_ == QLatin1String("ja"));
+}
+
+void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
+    QString normalized = themeCode.trimmed().toLower();
+    if (normalized != QLatin1String("nes")
+        && normalized != QLatin1String("light")
+        && normalized != QLatin1String("gray")
+        && normalized != QLatin1String("dark")) {
+        normalized = QStringLiteral("famicom");
+    }
+    currentThemeCode_ = normalized;
+
+    if (saveSetting) {
+        QSettings settings;
+        settings.setValue(QStringLiteral("ui/theme"), currentThemeCode_);
+    }
+
+    if (actThemeFamicom_) actThemeFamicom_->setChecked(currentThemeCode_ == QLatin1String("famicom"));
+    if (actThemeNes_)     actThemeNes_->setChecked(currentThemeCode_ == QLatin1String("nes"));
+    if (actThemeLight_)   actThemeLight_->setChecked(currentThemeCode_ == QLatin1String("light"));
+    if (actThemeGray_)    actThemeGray_->setChecked(currentThemeCode_ == QLatin1String("gray"));
+    if (actThemeDark_)    actThemeDark_->setChecked(currentThemeCode_ == QLatin1String("dark"));
+
+    // Use Fusion style so palettes, checkmarks, comboboxes, and button heights render reliably on macOS/Windows/Linux
+    static bool fusionApplied = false;
+    if (!fusionApplied) {
+        if (QStyle *fusion = QStyleFactory::create(QStringLiteral("Fusion"))) {
+            qApp->setStyle(fusion);
+        }
+        fusionApplied = true;
+    }
+
+    QPalette pal;
+    QString qss;
+    if (currentThemeCode_ == QLatin1String("famicom")) {
+        // Famicom / NES inspired: slightly warm yellowish-cream white + Famicom crimson red + gold trim
+        const QColor bg(QStringLiteral("#F2EBD5"));
+        const QColor card(QStringLiteral("#FAF5E4"));
+        const QColor base(QStringLiteral("#FFFDF7"));
+        const QColor alt(QStringLiteral("#F4EDE0"));
+        const QColor text(QStringLiteral("#2B1B17"));
+        const QColor btn(QStringLiteral("#EDE3C6"));
+        const QColor hi(QStringLiteral("#A61C24"));
+        const QColor hiText(QStringLiteral("#FFF9EB"));
+        const QColor dis(QStringLiteral("#9C8E75"));
+        const QColor mid(QStringLiteral("#C9BA95"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#9C8E75")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#E6DEC7")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #FAF5E4;
+                border: 1.5px solid #C9BA95;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #9E1B22;
+                background-color: #F2EBD5;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #A61C24;
+                color: #FFF9EB;
+                border: 1px solid #C59B38;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #88141B;
+                color: #FFF9EB;
+            }
+            QHeaderView::section {
+                background-color: #A61C24;
+                color: #FFF8E7;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #C59B38;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #B8A67D;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #A61C24;
+                border-radius: 3px;
+            }
+        )");
+    } else if (currentThemeCode_ == QLatin1String("nes")) {
+        // Nintendo Entertainment System (NES-001): Light gray (#D0D0D4), Charcoal (#343434), Red A/B (#D92B2B)
+        const QColor bg(QStringLiteral("#D0D0D4"));
+        const QColor card(QStringLiteral("#E2E2E6"));
+        const QColor base(QStringLiteral("#F4F4F6"));
+        const QColor alt(QStringLiteral("#E8E8EC"));
+        const QColor text(QStringLiteral("#1E1E1E"));
+        const QColor btn(QStringLiteral("#C2C2C7"));
+        const QColor hi(QStringLiteral("#D92B2B"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#787880"));
+        const QColor mid(QStringLiteral("#9E9EA6"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#343434")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#C8C8CD")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #E2E2E6;
+                border: 1.5px solid #4A4A50;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #D92B2B;
+                background-color: #D0D0D4;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #D92B2B;
+                color: #FFFFFF;
+                border: 1px solid #343434;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #B81D1D;
+            }
+            QHeaderView::section {
+                background-color: #343434;
+                color: #FFFFFF;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #6E6E75;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #4A4A50;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #D92B2B;
+                border-radius: 3px;
+            }
+        )");
+    } else if (currentThemeCode_ == QLatin1String("light")) {
+        const QColor bg(QStringLiteral("#F3F5F8"));
+        const QColor base(QStringLiteral("#FFFFFF"));
+        const QColor alt(QStringLiteral("#F8FAFC"));
+        const QColor text(QStringLiteral("#1E293B"));
+        const QColor btn(QStringLiteral("#E7ECF2"));
+        const QColor hi(QStringLiteral("#2563EB"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#94A3B8"));
+        const QColor mid(QStringLiteral("#CBD5E1"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, base);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#94A3B8")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#F1F5F9")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #FFFFFF;
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #1D4ED8;
+                background-color: #F3F5F8;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #2563EB;
+                color: #FFFFFF;
+                border: 1px solid #1D4ED8;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #1D4ED8;
+            }
+            QHeaderView::section {
+                background-color: #E2E8F0;
+                color: #1E293B;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #CBD5E1;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #CBD5E1;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #2563EB;
+                border-radius: 3px;
+            }
+        )");
+    } else if (currentThemeCode_ == QLatin1String("gray")) {
+        // Gray theme
+        const QColor bg(QStringLiteral("#2B2F36"));
+        const QColor card(QStringLiteral("#323740"));
+        const QColor base(QStringLiteral("#1E2126"));
+        const QColor alt(QStringLiteral("#252930"));
+        const QColor text(QStringLiteral("#E5E7EB"));
+        const QColor btn(QStringLiteral("#3F4550"));
+        const QColor hi(QStringLiteral("#3B82F6"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#6B7280"));
+        const QColor mid(QStringLiteral("#4B5260"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#1B1E23")));
+        pal.setColor(QPalette::Light, QColor(QStringLiteral("#525866")));
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#2E3239")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #323740;
+                border: 1px solid #4B5260;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #93C5FD;
+                background-color: #2B2F36;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #3B82F6;
+                color: #FFFFFF;
+                border: 1px solid #2563EB;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #2563EB;
+            }
+            QHeaderView::section {
+                background-color: #3B404A;
+                color: #E5E7EB;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #4B5260;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #4B5260;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #3B82F6;
+                border-radius: 3px;
+            }
+        )");
+    } else {
+        // Dark (Original) theme matching original macOS dark screenshot
+        const QColor bg(QStringLiteral("#262626"));
+        const QColor card(QStringLiteral("#2C2C2C"));
+        const QColor base(QStringLiteral("#141414"));
+        const QColor alt(QStringLiteral("#1A1A1A"));
+        const QColor text(QStringLiteral("#EAEAEA"));
+        const QColor btn(QStringLiteral("#464646"));
+        const QColor hi(QStringLiteral("#0A84FF"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#6E6E6E"));
+        const QColor mid(QStringLiteral("#3C3C3C"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#121212")));
+        pal.setColor(QPalette::Light, QColor(QStringLiteral("#555555")));
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#323232")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #2A2A2A;
+                border: 1px solid #3E3E3E;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #D4D4D4;
+                background-color: #262626;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #0A84FF;
+                color: #FFFFFF;
+                border: 1px solid #0066CC;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #0070E0;
+            }
+            QHeaderView::section {
+                background-color: #242424;
+                color: #DCDCDC;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #3A3A3A;
+                font-weight: bold;
+            }
+            QProgressBar {
+                background-color: #1A3A6E;
+                color: #FFFFFF;
+                border: 1px solid #3E3E3E;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #0A84FF;
+                border-radius: 3px;
+            }
+        )");
+    }
+
+    qApp->setPalette(pal);
+    qApp->setStyleSheet(qss);
+}
+
+void MainWindow::openSettingsDialog() {
+    QDialog dlg(this);
+    dlg.setMinimumWidth(420);
+
+    auto *vbox = new QVBoxLayout(&dlg);
+    auto *form = new QFormLayout();
+
+    auto *comboLang = new QComboBox(&dlg);
+    comboLang->addItem(tr("System Default"), QStringLiteral("auto"));
+    comboLang->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    comboLang->addItem(QStringLiteral("日本語 (Japanese)"), QStringLiteral("ja"));
+    if (const int i = comboLang->findData(currentLangCode_); i >= 0) {
+        comboLang->setCurrentIndex(i);
+    }
+
+    auto *comboTheme = new QComboBox(&dlg);
+    comboTheme->addItem(tr("Famicom (Red & Cream)"), QStringLiteral("famicom"));
+    comboTheme->addItem(tr("NES (Gray & Red)"), QStringLiteral("nes"));
+    comboTheme->addItem(tr("Light"), QStringLiteral("light"));
+    comboTheme->addItem(tr("Gray"), QStringLiteral("gray"));
+    comboTheme->addItem(tr("Dark (Original)"), QStringLiteral("dark"));
+    if (const int i = comboTheme->findData(currentThemeCode_); i >= 0) {
+        comboTheme->setCurrentIndex(i);
+    }
+
+    auto *lblLangRow = new QLabel(&dlg);
+    auto *lblThemeRow = new QLabel(&dlg);
+    auto *lblHint = new QLabel(&dlg);
+    lblHint->setWordWrap(true);
+
+    form->addRow(lblLangRow, comboLang);
+    form->addRow(lblThemeRow, comboTheme);
+    vbox->addLayout(form);
+    vbox->addWidget(lblHint);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::accept);
+    vbox->addWidget(buttons);
+
+    auto syncDlgText = [&]() {
+        dlg.setWindowTitle(tr("Settings"));
+        lblLangRow->setText(tr("Language:"));
+        lblThemeRow->setText(tr("Theme:"));
+        lblHint->setText(tr("Changes are applied immediately and saved automatically."));
+        if (const int i = comboLang->findData(QStringLiteral("auto")); i >= 0) {
+            comboLang->setItemText(i, tr("System Default"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("famicom")); i >= 0) {
+            comboTheme->setItemText(i, tr("Famicom (Red & Cream)"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("nes")); i >= 0) {
+            comboTheme->setItemText(i, tr("NES (Gray & Red)"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("light")); i >= 0) {
+            comboTheme->setItemText(i, tr("Light"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("gray")); i >= 0) {
+            comboTheme->setItemText(i, tr("Gray"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("dark")); i >= 0) {
+            comboTheme->setItemText(i, tr("Dark (Original)"));
+        }
+    };
+    syncDlgText();
+
+    connect(comboLang, &QComboBox::currentIndexChanged, &dlg, [&](int idx) {
+        if (idx < 0) return;
+        const QString code = comboLang->itemData(idx).toString();
+        if (code == currentLangCode_) return;
+        applyLanguage(code, true);
+        retranslateUi();
+        syncDlgText();
+    });
+
+    connect(comboTheme, &QComboBox::currentIndexChanged, &dlg, [&](int idx) {
+        if (idx < 0) return;
+        const QString code = comboTheme->itemData(idx).toString();
+        if (code == currentThemeCode_) return;
+        applyTheme(code, true);
+    });
+
+    dlg.exec();
+}
+
+void MainWindow::retranslateUi() {
+    setWindowTitle(tr("FireMinipro - An Open Source GUI for minipro CLI tool %1")
+                   .arg(QStringLiteral(FIREMINIPRO_VERSION)));
+
+    if (menuApp_)        menuApp_->setTitle(tr("&FireMinipro"));
+    if (actAbout_)       actAbout_->setText(tr("&About FireMinipro…"));
+    if (actPreferences_) actPreferences_->setText(tr("&Settings…"));
+    if (actQuit_)        actQuit_->setText(tr("&Quit"));
+    if (menuLanguage_)   menuLanguage_->setTitle(tr("&Language"));
+    if (actLangAuto_)    actLangAuto_->setText(tr("System Default"));
+    if (menuTheme_)      menuTheme_->setTitle(tr("&Theme"));
+    if (actThemeFamicom_) actThemeFamicom_->setText(tr("Famicom (Red & Cream)"));
+    if (actThemeNes_)    actThemeNes_->setText(tr("NES (Gray & Red)"));
+    if (actThemeLight_)  actThemeLight_->setText(tr("Light"));
+    if (actThemeGray_)   actThemeGray_->setText(tr("Gray"));
+    if (actThemeDark_)   actThemeDark_->setText(tr("Dark (Original)"));
+    if (actOpenSettings_) actOpenSettings_->setText(tr("Open Settings Window…"));
+    if (btnSettings_)    btnSettings_->setText(tr("Settings"));
+
+    if (groupTargets_) groupTargets_->setTitle(tr("Target"));
+    if (lblProg_)      lblProg_->setText(tr("Programmer:"));
+    if (lblDev_)       lblDev_->setText(tr("Device:"));
+    if (btnRescan)     btnRescan->setText(tr("Rescan"));
+    if (comboProgrammer) comboProgrammer->setPlaceholderText(tr("No programmer"));
+    if (comboDevice) {
+        comboDevice->setPlaceholderText(
+            (comboProgrammer && comboProgrammer->count() > 0 && comboDevice->count() == 0)
+            ? tr("No devices for this programmer")
+            : tr("No devices"));
+    }
+
+    if (groupChipInfo_)   groupChipInfo_->setTitle(tr("Chip information"));
+    if (lblChipKeyName_)  lblChipKeyName_->setText(tr("Name:"));
+    if (lblChipKeyPkg_)   lblChipKeyPkg_->setText(tr("Package:"));
+    if (lblChipKeyMem_)   lblChipKeyMem_->setText(tr("Memory:"));
+    if (lblChipKeyWidth_) lblChipKeyWidth_->setText(tr("Mem width:"));
+    if (lblChipKeyProto_) lblChipKeyProto_->setText(tr("Protocol:"));
+    updateChipInfo(lastChipInfo_);
+
+    if (groupBuffer_)     groupBuffer_->setTitle(tr("Buffer"));
+    if (btnLoadBinary)    btnLoadBinary->setText(tr("Load file to buffer"));
+    if (btnLoadAdvanced)  btnLoadAdvanced->setText(tr("Advanced load…"));
+    if (btnClear)         btnClear->setText(tr("Clear buffer"));
+    if (btnSave)          btnSave->setText(tr("Save buffer"));
+    if (btnRead)          btnRead->setText(tr("Read from target"));
+    if (btnWrite)         btnWrite->setText(tr("Write to target"));
+    if (chkAsciiSwap)     chkAsciiSwap->setText(tr("ASCII byteswap (16-bit)"));
+    if (lblBufSize) {
+        if (buffer_.isEmpty()) {
+            lblBufSize->setText(tr("Size: 0 (0x0)"));
+        } else {
+            lblBufSize->setText(tr("Size: %1 (0x%2)")
+                                .arg(QLocale().toString(buffer_.size()))
+                                .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
+        }
+    }
+    if (progReadWrite && !processBusy_) {
+        progReadWrite->setFormat(tr("Idle"));
+    }
+
+    if (groupDevOps_)     groupDevOps_->setTitle(tr("Device operations"));
+    if (btnBlankCheck)    btnBlankCheck->setText(tr("Blank check"));
+    if (btnEraseDevice)   btnEraseDevice->setText(tr("Erase device"));
+    if (btnTestLogic)     btnTestLogic->setText(tr("Test logic"));
+
+    if (groupOpts_)       groupOpts_->setTitle(tr("Device Options"));
+    if (chkSkipVerify)    chkSkipVerify->setText(tr("Skip verify"));
+    if (chkIgnoreId)      chkIgnoreId->setText(tr("Ignore ID error"));
+    if (chkSkipId)        chkSkipId->setText(tr("Skip ID check"));
+    if (chkNoSizeErr)     chkNoSizeErr->setText(tr("Ignore size error"));
+
+    if (hexModel && hexModel->columnCount() > 0) {
+        emit hexModel->headerDataChanged(Qt::Horizontal, 0, hexModel->columnCount() - 1);
+    }
+    if (segmentModel && segmentModel->columnCount() > 0) {
+        emit segmentModel->headerDataChanged(Qt::Horizontal, 0, segmentModel->columnCount() - 1);
+    }
 }

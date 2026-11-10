@@ -52,9 +52,9 @@ int HexView::columnCount(const QModelIndex &parent) const {
 
 QVariant HexView::headerData(int section, Qt::Orientation o, int role) const {
     if (o != Qt::Horizontal || role != Qt::DisplayRole) return {};
-    if (section == 0) return QStringLiteral("Addr");
+    if (section == 0) return tr("Addr");
     if (section == 1 + bytesPerRow_) {
-        return swapAscii16_ ? QStringLiteral("ASCII (swapped)") : QStringLiteral("ASCII");
+        return swapAscii16_ ? tr("ASCII (swapped)") : tr("ASCII");
     }
     if (section >= 1 && section <= bytesPerRow_) {
         return QString("%1").arg(section-1, 2, 16, QLatin1Char('0')).toUpper();
