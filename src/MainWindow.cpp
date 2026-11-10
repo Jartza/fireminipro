@@ -60,7 +60,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    setWindowTitle("FireMinipro - An Open Source GUI for minipro CLI tool " FIREMINIPRO_VERSION);
+    setWindowTitle(tr("FireMinipro - An Open Source GUI for minipro CLI tool %1")
+                   .arg(QStringLiteral(FIREMINIPRO_VERSION)));
     this->setMinimumSize(1050,768);
 
     // Menu bar
@@ -75,13 +76,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         const QString ver = QStringLiteral(FIREMINIPRO_VERSION);
         const QString qt  = QString::fromLatin1(qVersion());
 
-        QString html =
-            "<b>FireMinipro</b><br>"
-            "Version: " + ver + "<br>"
-            "Qt: " + qt + "<br><br>"
-            "A fast, buffer-first GUI for minipro.<br>"
-            "<small>© 2025 Jari Tulilahti / Firebay refurb.<br>"
-            "MIT License.</small>";
+        QString html = QStringLiteral("<b>FireMinipro</b><br>%1 %2<br>%3 %4<br><br>%5<br><small>© 2025 Jari Tulilahti / Firebay refurb.<br>%6</small>")
+            .arg(tr("Version:"), ver, tr("Qt:"), qt,
+                 tr("A fast, buffer-first GUI for minipro."),
+                 tr("MIT License."));
 
         QMessageBox box(this);
         box.setWindowTitle(tr("About FireMinipro"));
@@ -104,13 +102,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *leftLayout = new QVBoxLayout(leftBox);
 
     // Target group
-    auto *groupTargets = new QGroupBox("Target", leftBox);
+    auto *groupTargets = new QGroupBox(tr("Target"), leftBox);
     auto *gridT = new QGridLayout(groupTargets);
-    auto *lblProg = new QLabel("Programmer:", groupTargets);
-    auto *lblDev  = new QLabel("Device:",     groupTargets);
+    auto *lblProg = new QLabel(tr("Programmer:"), groupTargets);
+    auto *lblDev  = new QLabel(tr("Device:"),     groupTargets);
     comboProgrammer = new QComboBox(groupTargets);
     comboDevice = new QComboBox(groupTargets);
-    btnRescan = new QPushButton("Rescan", groupTargets);
+    btnRescan = new QPushButton(tr("Rescan"), groupTargets);
     QFont small = this->font();
     small.setPointSizeF(this->font().pointSizeF() - 1);
     lblProg->setFont(small);
@@ -131,8 +129,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     gridT->setColumnStretch(2, 0);
     gridT->setHorizontalSpacing(4);
 
-    comboProgrammer->setPlaceholderText("No programmer");
-    comboDevice->setPlaceholderText("No devices");
+    comboProgrammer->setPlaceholderText(tr("No programmer"));
+    comboDevice->setPlaceholderText(tr("No devices"));
     groupTargets->setLayout(gridT);
     leftLayout->addWidget(groupTargets);
 
@@ -226,12 +224,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     comboDevice->lineEdit()->setProperty("clearOnFirstClick", true);
 
     // Chip information (between Target and Buffer)
-    auto *groupChipInfo = new QGroupBox("Chip information", leftBox);
+    auto *groupChipInfo = new QGroupBox(tr("Chip information"), leftBox);
     auto *gridC = new QGridLayout(groupChipInfo);
 
     // left column (keys), right column (values)
-    auto addRow = [&](int r, const char *key, QLabel *&valueOut) {
-        auto *k = new QLabel(QString::fromUtf8(key), groupChipInfo);
+    auto addRow = [&](int r, const QString &key, QLabel *&valueOut) {
+        auto *k = new QLabel(key, groupChipInfo);
         k->setFont(small);
         k->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         valueOut = new QLabel("-", groupChipInfo);
@@ -242,11 +240,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // rows
     int r = 0;
-    addRow(r++, "Name:",           chipName);
-    addRow(r++, "Package:",        chipPackage);
-    addRow(r++, "Memory:",         chipMemory);
-    addRow(r++, "Mem width:",      chipBusWidth);
-    addRow(r++, "Protocol:",       chipProtocol);
+    addRow(r++, tr("Name:"),           chipName);
+    addRow(r++, tr("Package:"),        chipPackage);
+    addRow(r++, tr("Memory:"),         chipMemory);
+    addRow(r++, tr("Mem width:"),      chipBusWidth);
+    addRow(r++, tr("Protocol:"),       chipProtocol);
 
     gridC->setColumnStretch(0, 0);
     gridC->setColumnStretch(1, 1);
@@ -257,24 +255,24 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     clearChipInfo();
 
     // Buffer group
-    auto *groupBuffer = new QGroupBox("Buffer", leftBox);
+    auto *groupBuffer = new QGroupBox(tr("Buffer"), leftBox);
     auto *gridB  = new QGridLayout(groupBuffer);
-    btnClear     = new QPushButton("Clear buffer", groupBuffer);
-    btnSave      = new QPushButton("Save buffer", groupBuffer);
-    btnRead      = new QPushButton("Read from target",  groupBuffer);
-    btnWrite     = new QPushButton("Write to target", groupBuffer);
-    chkAsciiSwap = new QCheckBox("ASCII byteswap (16-bit)", groupBuffer);
-    btnLoadBinary   = new QPushButton("Load file to buffer", groupBuffer);
-    btnLoadAdvanced = new QPushButton("Advanced load…", groupBuffer);
+    btnClear     = new QPushButton(tr("Clear buffer"), groupBuffer);
+    btnSave      = new QPushButton(tr("Save buffer"), groupBuffer);
+    btnRead      = new QPushButton(tr("Read from target"),  groupBuffer);
+    btnWrite     = new QPushButton(tr("Write to target"), groupBuffer);
+    chkAsciiSwap = new QCheckBox(tr("ASCII byteswap (16-bit)"), groupBuffer);
+    btnLoadBinary   = new QPushButton(tr("Load file to buffer"), groupBuffer);
+    btnLoadAdvanced = new QPushButton(tr("Advanced load…"), groupBuffer);
     progReadWrite = new QProgressBar(groupBuffer);
 
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
-    progReadWrite->setFormat(QStringLiteral("Idle"));
+    progReadWrite->setFormat(tr("Idle"));
     progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
-    if (!lblBufSize)  lblBufSize  = new QLabel("Size: 0 (0x0)", groupBuffer);
+    if (!lblBufSize)  lblBufSize  = new QLabel(tr("Size: 0 (0x0)"), groupBuffer);
 
     gridB->addWidget(btnLoadBinary,   0, 0, 1, 1);
     gridB->addWidget(btnLoadAdvanced, 0, 1, 1, 1);
@@ -290,12 +288,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addWidget(groupBuffer);
 
     // Device operations group (sits between Buffer and Options)
-    auto *groupDevOps = new QGroupBox("Device operations", leftBox);
+    auto *groupDevOps = new QGroupBox(tr("Device operations"), leftBox);
     auto *gridDO      = new QGridLayout(groupDevOps);
 
-    btnBlankCheck  = new QPushButton("Blank check",  groupDevOps);
-    btnEraseDevice = new QPushButton("Erase device", groupDevOps);
-    btnTestLogic   = new QPushButton("Test logic",   groupDevOps);
+    btnBlankCheck  = new QPushButton(tr("Blank check"),  groupDevOps);
+    btnEraseDevice = new QPushButton(tr("Erase device"), groupDevOps);
+    btnTestLogic   = new QPushButton(tr("Test logic"),   groupDevOps);
 
     // Layout: two columns, then one full-width
     gridDO->addWidget(btnBlankCheck,  0, 0);
@@ -306,12 +304,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     leftLayout->addWidget(groupDevOps);
 
     // Device Options
-    auto *groupOpts  = new QGroupBox("Device Options", leftBox);
+    auto *groupOpts  = new QGroupBox(tr("Device Options"), leftBox);
     auto *gridO      = new QGridLayout(groupOpts);
-    chkSkipVerify    = new QCheckBox("Skip verify", groupOpts);
-    chkIgnoreId      = new QCheckBox("Ignore ID error", groupOpts);
-    chkSkipId        = new QCheckBox("Skip ID check", groupOpts);
-    chkNoSizeErr     = new QCheckBox("Ignore size error", groupOpts);
+    chkSkipVerify    = new QCheckBox(tr("Skip verify"), groupOpts);
+    chkIgnoreId      = new QCheckBox(tr("Ignore ID error"), groupOpts);
+    chkSkipId        = new QCheckBox(tr("Skip ID check"), groupOpts);
+    chkNoSizeErr     = new QCheckBox(tr("Ignore size error"), groupOpts);
 
     // layout options (2 columns)
     gridO->addWidget(chkSkipVerify,    0,0);
@@ -420,7 +418,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         bufferSegments.clear();
         updateLegendTable();
         if (hexModel) hexModel->setBufferRef(&buffer_);
-        if (lblBufSize)  lblBufSize->setText("Size: 0 (0x0)");
+        if (lblBufSize)  lblBufSize->setText(tr("Size: 0 (0x0)"));
         updateActionEnabling();
     });
     connect(btnSave,  &QPushButton::clicked, this, &MainWindow::saveBufferToFile);
@@ -443,7 +441,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(proc, &ProcessHandling::devicesScanned, this, [this](const QStringList &names){
         if (!log) return;
         if (!names.isEmpty()) {
-            for (const auto &n : names) log->appendPlainText("[Scan] " + n);
+            for (const auto &n : names) log->appendPlainText(tr("[Scan] %1").arg(n));
         }
     });
 
@@ -456,10 +454,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     connect(btnRescan, &QPushButton::clicked, this, [this]{
         if (!proc) return;
         comboProgrammer->clear();
-        comboProgrammer->setPlaceholderText("No programmer");
+        comboProgrammer->setPlaceholderText(tr("No programmer"));
         comboProgrammer->setEnabled(false);
         comboDevice->clear();
-        comboDevice->setPlaceholderText("No devices");
+        comboDevice->setPlaceholderText(tr("No devices"));
         comboDevice->setEnabled(false);
         proc->scanConnectedDevices();
     });
@@ -508,13 +506,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         const QString d = comboDevice->currentText().trimmed();
         if (p.isEmpty() || d.isEmpty()) return;
         if (buffer_.isEmpty()) {
-            if (log) log->appendPlainText("[Error] buffer is empty");
+            if (log) log->appendPlainText(tr("[Error] buffer is empty"));
             return;
         }
         // Export buffer to a temp file
         QString tempPath = exportBufferToTempFileLocal("fmp-write");
         if (tempPath.isEmpty()) {
-            if (log) log->appendPlainText("[Error] failed to create temp file for writing");
+            if (log) log->appendPlainText(tr("[Error] failed to create temp file for writing"));
             return;
         }
         pendingWriteTempPath_ = tempPath;
@@ -553,7 +551,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
             QApplication::restoreOverrideCursor();
             if (progReadWrite) {
                 progReadWrite->setValue(100);
-                progReadWrite->setFormat(QStringLiteral("Idle"));
+                progReadWrite->setFormat(tr("Idle"));
                 progReadWrite->setTextVisible(true);
             }
             if (!pendingWriteTempPath_.isEmpty()) {
@@ -737,12 +735,12 @@ void MainWindow::updateChipInfo(const ProcessHandling::ChipInfo &ci)
     if (ci.isLogic) {
         currentIsLogic_ = true;
         chipMemory  ->setText("-");  // logic ICs don’t have a byte size
-        chipBusWidth->setText(QString("Logic IC%1")
-                              .arg(ci.vectorCount > 0 ? QString(" (%1 vectors)").arg(ci.vectorCount) : QString()));
+        chipBusWidth->setText(tr("Logic IC%1")
+                              .arg(ci.vectorCount > 0 ? tr(" (%1 vectors)").arg(ci.vectorCount) : QString()));
     } else {
         currentIsLogic_ = false;
         chipMemory  ->setText(prettyBytes(ci.bytes));
-        chipBusWidth->setText(ci.wordBits > 0 ? QString("%1-bit").arg(ci.wordBits) : "-");
+        chipBusWidth->setText(ci.wordBits > 0 ? tr("%1-bit").arg(ci.wordBits) : "-");
     }
     chipProtocol ->setText(ci.protocol.isEmpty()   ? "-" : ci.protocol);
 
@@ -758,7 +756,7 @@ void MainWindow::clearChipInfo()
 }
 
 void MainWindow::saveBufferToFile() {
-    if (buffer_.isEmpty()) { log->appendPlainText("[Info] Buffer is empty"); return; }
+    if (buffer_.isEmpty()) { log->appendPlainText(tr("[Info] Buffer is empty")); return; }
 #if defined(Q_OS_MACOS)
     const QString path = pickFile(tr("Save image"),
                                   QFileDialog::AcceptSave,
@@ -771,17 +769,17 @@ void MainWindow::saveBufferToFile() {
     if (path.isEmpty()) return;
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
-        log->appendPlainText(QString("[Error] save: %1").arg(f.errorString()));
+        log->appendPlainText(tr("[Error] save: %1").arg(f.errorString()));
         return;
     }
     // Error check the write
     if (f.write(buffer_) != buffer_.size()) {
-        log->appendPlainText("[Error] save: write failed");
+        log->appendPlainText(tr("[Error] save: write failed"));
         f.close();
         return;
     }
     f.close();
-    log->appendPlainText(QString("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
+    log->appendPlainText(tr("[Saved] %1 bytes to %2").arg(buffer_.size()).arg(path));
     lastPath_ = QFileInfo(path).absolutePath();
 }
 
@@ -789,7 +787,7 @@ void MainWindow::saveBufferToFile() {
 QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
 {
     if (buffer_.isEmpty()) {
-        if (log) log->appendPlainText("[Write] Buffer is empty.");
+        if (log) log->appendPlainText(tr("[Write] Buffer is empty."));
         return {};
     }
 
@@ -801,18 +799,18 @@ QString MainWindow::exportBufferToTempFileLocal(const QString& baseName)
 
     QFile f(path);
     if (!f.open(QIODevice::WriteOnly)) {
-        if (log) log->appendPlainText(QString("[Write] open temp failed: %1").arg(f.errorString()));
+        if (log) log->appendPlainText(tr("[Write] open temp failed: %1").arg(f.errorString()));
         return {};
     }
     if (f.write(buffer_) != buffer_.size()) {
-        if (log) log->appendPlainText("[Write] write temp failed.");
+        if (log) log->appendPlainText(tr("[Write] write temp failed."));
         f.close();
         f.remove();
         return {};
     }
     f.close();
 
-    if (log) log->appendPlainText(QString("[Write] Exported buffer to %1").arg(path));
+    if (log) log->appendPlainText(tr("[Write] Exported buffer to %1").arg(path));
     return path;
 }
 
@@ -876,8 +874,8 @@ void MainWindow::onDevicesScanned(const QStringList &names)
     comboProgrammer->clear();
 
     if (names.isEmpty()) {
-        comboProgrammer->setPlaceholderText("No programmer");
-        if (log) log->appendPlainText("[Error] No programmer found.");
+        comboProgrammer->setPlaceholderText(tr("No programmer"));
+        if (log) log->appendPlainText(tr("[Error] No programmer found."));
         // (Optional) disable actions that need a programmer here
         return;
     }
@@ -885,7 +883,7 @@ void MainWindow::onDevicesScanned(const QStringList &names)
     comboProgrammer->addItems(names);
     comboProgrammer->setCurrentIndex(0);
     comboProgrammer->setEnabled(true);
-    if (log) log->appendPlainText(QString("[Info] Found %1 programmer(s).").arg(names.size()));
+    if (log) log->appendPlainText(tr("[Info] Found %1 programmer(s).").arg(names.size()));
 }
 
 void MainWindow::onDevicesListed(const QStringList &names)
@@ -894,9 +892,9 @@ void MainWindow::onDevicesListed(const QStringList &names)
     comboDevice->clear();
 
     if (names.isEmpty()) {
-        comboDevice->setPlaceholderText("No devices for this programmer");
+        comboDevice->setPlaceholderText(tr("No devices for this programmer"));
         comboDevice->setEnabled(false);
-        if (log) log->appendPlainText("[Error] No devices found for selected programmer.");
+        if (log) log->appendPlainText(tr("[Error] No devices found for selected programmer."));
         return;
     }
 
@@ -906,7 +904,7 @@ void MainWindow::onDevicesListed(const QStringList &names)
     comboDevice->setCurrentIndex(-1);
     comboDevice->setEnabled(true);
 
-    if (log) log->appendPlainText(QString("[Info] Loaded %1 devices.").arg(sorted.size()));
+    if (log) log->appendPlainText(tr("[Info] Loaded %1 devices.").arg(sorted.size()));
 }
 
 // Load file to buffer at user-specified offset, with optional padding
@@ -917,7 +915,7 @@ void MainWindow::loadFileAppendDialog() {
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
-        if (log) log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        if (log) log->appendPlainText(tr("[Error] open: %1").arg(f.errorString()));
         return;
     }
 
@@ -935,13 +933,13 @@ void MainWindow::loadFileAppendDialog() {
 
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
 
     if (log) {
-        log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+        log->appendPlainText(tr("[Loaded] %1 bytes at 0x%2 from %3")
                              .arg(QLocale().toString(len))
                              .arg(QString::number(start, 16).toUpper())
                              .arg(QFileInfo(path).fileName()));
@@ -980,7 +978,7 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
 
     QFile f(path);
     if (!f.open(QIODevice::ReadOnly)) {
-        log->appendPlainText(QString("[Error] open: %1").arg(f.errorString()));
+        log->appendPlainText(tr("[Error] open: %1").arg(f.errorString()));
         return;
     }
     const QByteArray file = f.readAll();
@@ -1066,21 +1064,21 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         const qulonglong effLen = haveLen ? lenReq : fileSize;
         // Offset info (bold heading)
         if (offOk) {
-            lblOffInfo->setText(QString("<b>Offset:</b> 0x%1 (%2)")
+            lblOffInfo->setText(tr("<b>Offset:</b> 0x%1 (%2)")
                                 .arg(QString::number(off, 16).toUpper())
                                 .arg(QLocale().toString(off)));
         } else {
-            lblOffInfo->setText(QString("<b>Offset:</b> <span style='color:#c00'>invalid</span>"));
+            lblOffInfo->setText(tr("<b>Offset:</b> <span style='color:#c00'>invalid</span>"));
         }
         // Length + File info (bold headings, multiline)
         if (haveLen) {
-            lblLenInfo->setText(QString("<b>Length:</b> 0x%1 (%2)<br/><b>File size:</b> 0x%3 (%4)")
+            lblLenInfo->setText(tr("<b>Length:</b> 0x%1 (%2)<br/><b>File size:</b> 0x%3 (%4)")
                                 .arg(QString::number(lenReq, 16).toUpper())
                                 .arg(QLocale().toString(lenReq))
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         } else {
-            lblLenInfo->setText(QString("<b>Length:</b> whole file<br/><b>File size:</b> 0x%1 (%2)")
+            lblLenInfo->setText(tr("<b>Length:</b> whole file<br/><b>File size:</b> 0x%1 (%2)")
                                 .arg(QString::number(fileSize, 16).toUpper())
                                 .arg(QLocale().toString(fileSize)));
         }
@@ -1088,7 +1086,7 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         if (offOk && effLen > 0) {
             const qulonglong endAddr = off + effLen - 1;
             const qulonglong newSizeIfAppend = std::max<qulonglong>(buffer_.size(), off + effLen);
-            lblEndInfo->setText(QString("<b>End address:</b> 0x%1 (%2)<br/><b>New buffer size:</b> 0x%3 (%4)")
+            lblEndInfo->setText(tr("<b>End address:</b> 0x%1 (%2)<br/><b>New buffer size:</b> 0x%3 (%4)")
                                 .arg(QString::number(endAddr, 16).toUpper())
                                 .arg(QLocale().toString(endAddr))
                                 .arg(QString::number(newSizeIfAppend, 16).toUpper())
@@ -1129,12 +1127,12 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
 
     // Parse final values
     qulonglong off=0, len=0, pad=0xFF;
-    if (!parseSizeLike(editOff->text(), off)) { log->appendPlainText("[Error] invalid offset"); return; }
+    if (!parseSizeLike(editOff->text(), off)) { log->appendPlainText(tr("[Error] invalid offset")); return; }
     if (!editLen->text().trimmed().isEmpty() && !parseSizeLike(editLen->text(), len)) {
-        log->appendPlainText("[Error] invalid length"); return;
+        log->appendPlainText(tr("[Error] invalid length")); return;
     }
     if (!parseSizeLike(editPad->text(), pad) || pad > 0xFF) {
-        log->appendPlainText("[Error] invalid pad"); return;
+        log->appendPlainText(tr("[Error] invalid pad")); return;
     }
 
     // Determine effective length: default to full file if length omitted/invalid
@@ -1160,19 +1158,19 @@ void MainWindow::loadAtOffsetDialog(QString path, bool deleteOnFinish) {
         if (prePadLen > 0)  parts << tr("pre:%1").arg(QLocale().toString(prePadLen));
         if (postPadLen > 0) parts << tr("post:%1").arg(QLocale().toString(postPadLen));
         const QString padByteText = QString::number(pad & 0xFF, 16).toUpper().rightJustified(2, QLatin1Char('0'));
-        displayName += QString(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
+        displayName += tr(" (padded 0x%1 %2)").arg(padByteText, parts.join(QLatin1Char(' ')));
     }
     addSegmentAndRefresh(off, effLen, displayName);
     if (!deleteOnFinish)
         lastPath_ = QFileInfo(path).absolutePath();
 
-    log->appendPlainText(QString("[Loaded] %1 bytes at 0x%2 from %3")
+    log->appendPlainText(tr("[Loaded] %1 bytes at 0x%2 from %3")
                          .arg(QLocale().toString(effLen))
                          .arg(QString::number(off, 16).toUpper())
                          .arg(QFileInfo(path).fileName()));
 
     if (lblBufSize)
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
 
@@ -1329,7 +1327,7 @@ void MainWindow::onLegendFilesDropped(int row, const QList<QUrl> &urls) {
     }
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
@@ -1401,7 +1399,7 @@ void MainWindow::deleteSegmentAt(int row) {
     }
     if (hexModel) hexModel->setBufferRef(&buffer_);
     if (lblBufSize) {
-        lblBufSize->setText(QString("Size: %1 (0x%2)")
+        lblBufSize->setText(tr("Size: %1 (0x%2)")
                             .arg(QLocale().toString(buffer_.size()))
                             .arg(QString::number(qulonglong(buffer_.size()), 16).toUpper()));
     }
@@ -1466,17 +1464,17 @@ void MainWindow::addSegmentAndRefresh(qulonglong start, qulonglong length, const
         if (hasLeftRemainder || hasRightRemainder) anyPartialOverlap = true;
 
         if (hasLeftRemainder)
-            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, QStringLiteral(" (partial)") , seg.id });
+            out.append(BufferSegment{ sBeg, nBeg - sBeg, seg.label, tr(" (partial)") , seg.id });
 
         // middle overlapped portion is dropped
 
         if (hasRightRemainder)
-            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, QStringLiteral(" (partial)") , seg.id });
+            out.append(BufferSegment{ nEnd, sEnd - nEnd, seg.label, tr(" (partial)") , seg.id });
     }
 
     const qulonglong thisInsertId = nextSegmentId_++;
     out.append(BufferSegment{ nBeg, length, label,
-                              anyPartialOverlap ? QStringLiteral(" (overlap)") : QString(),
+                              anyPartialOverlap ? tr(" (overlap)") : QString(),
                               thisInsertId });
 
     std::sort(out.begin(), out.end(),

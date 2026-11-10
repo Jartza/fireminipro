@@ -1,19 +1,7 @@
 #include <QApplication>
-#include <QObject>
-#include <QProcess>
-#include <QStringList>
-#include <QMainWindow>
-#include <QWidget>
-#include <QComboBox>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QTableView>
-#include <QPlainTextEdit>
-#include <QLabel>
-#include <QGroupBox>
-#include <QGridLayout>
-#include <QVBoxLayout>
-#include <QSplitter>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QTranslator>
 #include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
@@ -21,6 +9,21 @@ int main(int argc, char *argv[]) {
     QCoreApplication::setOrganizationName("Firebay refurb");
     QCoreApplication::setApplicationName("fireminipro");
     app.setWindowIcon(QIcon(":/appicon.png"));
+
+    const QString langOverride = qEnvironmentVariable("FIREMINIPRO_LANG").trimmed();
+    const QLocale targetLocale = langOverride.isEmpty() ? QLocale::system() : QLocale(langOverride);
+
+    QTranslator qtTranslator;
+    if (qtTranslator.load(targetLocale, QStringLiteral("qtbase"), QStringLiteral("_"),
+                          QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        app.installTranslator(&qtTranslator);
+    }
+
+    QTranslator appTranslator;
+    if (appTranslator.load(targetLocale, QStringLiteral("fireminipro"), QStringLiteral("_"),
+                           QStringLiteral(":/i18n"))) {
+        app.installTranslator(&appTranslator);
+    }
 
     MainWindow w;
     w.show();

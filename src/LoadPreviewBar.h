@@ -6,6 +6,7 @@
 
 // Visualizes how a file will be merged into the current buffer.
 class LoadPreviewBar : public QWidget {
+    Q_OBJECT
 public:
     explicit LoadPreviewBar(QWidget *parent = nullptr);
 

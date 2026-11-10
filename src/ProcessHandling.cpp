@@ -372,8 +372,8 @@ QString ProcessHandling::detectPhaseText(const QString &line) {
     static const QRegularExpression wr(R"(\bWriting\s*Code\.\.\.)",
         QRegularExpression::CaseInsensitiveOption);
 
-    if (rd.match(line).hasMatch()) return QStringLiteral("Reading");
-    if (wr.match(line).hasMatch()) return QStringLiteral("Writing");
+    if (rd.match(line).hasMatch()) return tr("Reading");
+    if (wr.match(line).hasMatch()) return tr("Writing");
     return {};
 }
 
