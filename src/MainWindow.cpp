@@ -143,14 +143,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     auto *themeGroup = new QActionGroup(this);
     themeGroup->setExclusive(true);
 
-    actThemeFamicom_ = new QAction(tr("Famicom / NES (Red & Cream)"), this);
+    actThemeFamicom_ = new QAction(tr("Famicom (Red & Cream)"), this);
     actThemeFamicom_->setCheckable(true);
+    actThemeNes_ = new QAction(tr("NES (Gray & Red)"), this);
+    actThemeNes_->setCheckable(true);
     actThemeLight_ = new QAction(tr("Light"), this);
     actThemeLight_->setCheckable(true);
     actThemeGray_ = new QAction(tr("Gray"), this);
     actThemeGray_->setCheckable(true);
+    actThemeDark_ = new QAction(tr("Dark (Original)"), this);
+    actThemeDark_->setCheckable(true);
 
-    for (QAction *a : {actThemeFamicom_, actThemeLight_, actThemeGray_}) {
+    for (QAction *a : {actThemeFamicom_, actThemeNes_, actThemeLight_, actThemeGray_, actThemeDark_}) {
         themeGroup->addAction(a);
         menuTheme_->addAction(a);
     }
@@ -160,8 +164,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     menuTheme_->addAction(actOpenSettings_);
 
     connect(actThemeFamicom_, &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("famicom"), true); });
+    connect(actThemeNes_,     &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("nes"),     true); });
     connect(actThemeLight_,   &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("light"),   true); });
     connect(actThemeGray_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("gray"),    true); });
+    connect(actThemeDark_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("dark"),    true); });
 
     // Left column inside a scroll area so controls never collapse vertically
     auto *leftScroll = new QScrollArea(central);
@@ -1651,7 +1657,10 @@ void MainWindow::applyLanguage(const QString &langCode, bool saveSetting) {
 
 void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
     QString normalized = themeCode.trimmed().toLower();
-    if (normalized != QLatin1String("light") && normalized != QLatin1String("gray")) {
+    if (normalized != QLatin1String("nes")
+        && normalized != QLatin1String("light")
+        && normalized != QLatin1String("gray")
+        && normalized != QLatin1String("dark")) {
         normalized = QStringLiteral("famicom");
     }
     currentThemeCode_ = normalized;
@@ -1662,8 +1671,10 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
     }
 
     if (actThemeFamicom_) actThemeFamicom_->setChecked(currentThemeCode_ == QLatin1String("famicom"));
+    if (actThemeNes_)     actThemeNes_->setChecked(currentThemeCode_ == QLatin1String("nes"));
     if (actThemeLight_)   actThemeLight_->setChecked(currentThemeCode_ == QLatin1String("light"));
     if (actThemeGray_)    actThemeGray_->setChecked(currentThemeCode_ == QLatin1String("gray"));
+    if (actThemeDark_)    actThemeDark_->setChecked(currentThemeCode_ == QLatin1String("dark"));
 
     // Use Fusion style so palettes, checkmarks, comboboxes, and button heights render reliably on macOS/Windows/Linux
     static bool fusionApplied = false;
@@ -1754,6 +1765,83 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 border-radius: 3px;
             }
         )");
+    } else if (currentThemeCode_ == QLatin1String("nes")) {
+        // Nintendo Entertainment System (NES-001): Light gray (#D0D0D4), Charcoal (#343434), Red A/B (#D92B2B)
+        const QColor bg(QStringLiteral("#D0D0D4"));
+        const QColor card(QStringLiteral("#E2E2E6"));
+        const QColor base(QStringLiteral("#F4F4F6"));
+        const QColor alt(QStringLiteral("#E8E8EC"));
+        const QColor text(QStringLiteral("#1E1E1E"));
+        const QColor btn(QStringLiteral("#C2C2C7"));
+        const QColor hi(QStringLiteral("#D92B2B"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#787880"));
+        const QColor mid(QStringLiteral("#9E9EA6"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#343434")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#C8C8CD")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #E2E2E6;
+                border: 1.5px solid #4A4A50;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #D92B2B;
+                background-color: #D0D0D4;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #D92B2B;
+                color: #FFFFFF;
+                border: 1px solid #343434;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #B81D1D;
+            }
+            QHeaderView::section {
+                background-color: #343434;
+                color: #FFFFFF;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #6E6E75;
+                font-weight: bold;
+            }
+            QProgressBar {
+                border: 1px solid #4A4A50;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #D92B2B;
+                border-radius: 3px;
+            }
+        )");
     } else if (currentThemeCode_ == QLatin1String("light")) {
         const QColor bg(QStringLiteral("#F3F5F8"));
         const QColor base(QStringLiteral("#FFFFFF"));
@@ -1829,7 +1917,7 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 border-radius: 3px;
             }
         )");
-    } else {
+    } else if (currentThemeCode_ == QLatin1String("gray")) {
         // Gray theme
         const QColor bg(QStringLiteral("#2B2F36"));
         const QColor card(QStringLiteral("#323740"));
@@ -1906,6 +1994,85 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 border-radius: 3px;
             }
         )");
+    } else {
+        // Dark (Original) theme matching original macOS dark screenshot
+        const QColor bg(QStringLiteral("#262626"));
+        const QColor card(QStringLiteral("#2C2C2C"));
+        const QColor base(QStringLiteral("#141414"));
+        const QColor alt(QStringLiteral("#1A1A1A"));
+        const QColor text(QStringLiteral("#EAEAEA"));
+        const QColor btn(QStringLiteral("#464646"));
+        const QColor hi(QStringLiteral("#0A84FF"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#6E6E6E"));
+        const QColor mid(QStringLiteral("#3C3C3C"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#121212")));
+        pal.setColor(QPalette::Light, QColor(QStringLiteral("#555555")));
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#323232")));
+
+        qss = QStringLiteral(R"(
+            QGroupBox {
+                background-color: #2A2A2A;
+                border: 1px solid #3E3E3E;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
+                font-weight: bold;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 8px;
+                padding: 0 5px;
+                color: #D4D4D4;
+                background-color: #262626;
+            }
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #0A84FF;
+                color: #FFFFFF;
+                border: 1px solid #0066CC;
+                font-weight: bold;
+            }
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #0070E0;
+            }
+            QHeaderView::section {
+                background-color: #242424;
+                color: #DCDCDC;
+                padding: 4px 6px;
+                border: none;
+                border-right: 1px solid #3A3A3A;
+                font-weight: bold;
+            }
+            QProgressBar {
+                background-color: #1A3A6E;
+                color: #FFFFFF;
+                border: 1px solid #3E3E3E;
+                border-radius: 4px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background-color: #0A84FF;
+                border-radius: 3px;
+            }
+        )");
     }
 
     qApp->setPalette(pal);
@@ -1928,9 +2095,11 @@ void MainWindow::openSettingsDialog() {
     }
 
     auto *comboTheme = new QComboBox(&dlg);
-    comboTheme->addItem(tr("Famicom / NES (Red & Cream)"), QStringLiteral("famicom"));
+    comboTheme->addItem(tr("Famicom (Red & Cream)"), QStringLiteral("famicom"));
+    comboTheme->addItem(tr("NES (Gray & Red)"), QStringLiteral("nes"));
     comboTheme->addItem(tr("Light"), QStringLiteral("light"));
     comboTheme->addItem(tr("Gray"), QStringLiteral("gray"));
+    comboTheme->addItem(tr("Dark (Original)"), QStringLiteral("dark"));
     if (const int i = comboTheme->findData(currentThemeCode_); i >= 0) {
         comboTheme->setCurrentIndex(i);
     }
@@ -1958,13 +2127,19 @@ void MainWindow::openSettingsDialog() {
             comboLang->setItemText(i, tr("System Default"));
         }
         if (const int i = comboTheme->findData(QStringLiteral("famicom")); i >= 0) {
-            comboTheme->setItemText(i, tr("Famicom / NES (Red & Cream)"));
+            comboTheme->setItemText(i, tr("Famicom (Red & Cream)"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("nes")); i >= 0) {
+            comboTheme->setItemText(i, tr("NES (Gray & Red)"));
         }
         if (const int i = comboTheme->findData(QStringLiteral("light")); i >= 0) {
             comboTheme->setItemText(i, tr("Light"));
         }
         if (const int i = comboTheme->findData(QStringLiteral("gray")); i >= 0) {
             comboTheme->setItemText(i, tr("Gray"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("dark")); i >= 0) {
+            comboTheme->setItemText(i, tr("Dark (Original)"));
         }
     };
     syncDlgText();
@@ -1999,9 +2174,11 @@ void MainWindow::retranslateUi() {
     if (menuLanguage_)   menuLanguage_->setTitle(tr("&Language"));
     if (actLangAuto_)    actLangAuto_->setText(tr("System Default"));
     if (menuTheme_)      menuTheme_->setTitle(tr("&Theme"));
-    if (actThemeFamicom_) actThemeFamicom_->setText(tr("Famicom / NES (Red & Cream)"));
+    if (actThemeFamicom_) actThemeFamicom_->setText(tr("Famicom (Red & Cream)"));
+    if (actThemeNes_)    actThemeNes_->setText(tr("NES (Gray & Red)"));
     if (actThemeLight_)  actThemeLight_->setText(tr("Light"));
     if (actThemeGray_)   actThemeGray_->setText(tr("Gray"));
+    if (actThemeDark_)   actThemeDark_->setText(tr("Dark (Original)"));
     if (actOpenSettings_) actOpenSettings_->setText(tr("Open Settings Window…"));
     if (btnSettings_)    btnSettings_->setText(tr("Settings"));
 

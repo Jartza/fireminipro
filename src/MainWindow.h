@@ -56,8 +56,11 @@ private:
     QAction     *actLangJa_{};
     QMenu       *menuTheme_{};
     QAction     *actThemeFamicom_{};
+    QAction     *actThemeNes_{};
     QAction     *actThemeLight_{};
     QAction     *actThemeGray_{};
+    QAction     *actThemeDark_{};
+    QAction     *actOpenSettings_{};
     QAction     *actOpenSettings_{};
     QTranslator *qtTranslator_{};
     QTranslator *appTranslator_{};
