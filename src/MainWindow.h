@@ -61,7 +61,6 @@ private:
     QAction     *actThemeGray_{};
     QAction     *actThemeDark_{};
     QAction     *actOpenSettings_{};
-    QAction     *actOpenSettings_{};
     QTranslator *qtTranslator_{};
     QTranslator *appTranslator_{};
     QString      currentLangCode_{QStringLiteral("auto")};
