@@ -6,6 +6,7 @@
 #include <QGroupBox>
 #include <QGridLayout>
 #include <QPlainTextEdit>
+#include <QScrollArea>
 #include <QScrollBar>
 #include <QPushButton>
 #include <QSplitter>
@@ -71,7 +72,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     // Main window central widget
     auto *central = new QWidget(this);
     setCentralWidget(central);
-    this->setMinimumSize(1050,768);
+    this->setMinimumSize(1060, 740);
+    this->resize(1160, 840);
 
     // Menu bar
     auto *mb = menuBar();
@@ -98,6 +100,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         box.exec();
     });
     menuApp_->addAction(actAbout_);
+
+    actPreferences_ = new QAction(tr("&Settings…"), this);
+    actPreferences_->setShortcuts(QKeySequence::Preferences);
+    actPreferences_->setMenuRole(QAction::PreferencesRole);
+    connect(actPreferences_, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    menuApp_->addAction(actPreferences_);
     menuApp_->addSeparator();
 
     actQuit_ = new QAction(tr("&Quit"), this);
@@ -146,55 +154,30 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
         themeGroup->addAction(a);
         menuTheme_->addAction(a);
     }
+    menuTheme_->addSeparator();
+    actOpenSettings_ = new QAction(tr("Open Settings Window…"), this);
+    connect(actOpenSettings_, &QAction::triggered, this, &MainWindow::openSettingsDialog);
+    menuTheme_->addAction(actOpenSettings_);
+
     connect(actThemeFamicom_, &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("famicom"), true); });
     connect(actThemeLight_,   &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("light"),   true); });
     connect(actThemeGray_,    &QAction::triggered, this, [this]{ applyTheme(QStringLiteral("gray"),    true); });
 
-    // Left column
-    auto *leftBox = new QWidget(central);
+    // Left column inside a scroll area so controls never collapse vertically
+    auto *leftScroll = new QScrollArea(central);
+    leftScroll->setWidgetResizable(true);
+    leftScroll->setFrameShape(QFrame::NoFrame);
+    leftScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    leftScroll->setMinimumWidth(340);
+
+    auto *leftBox = new QWidget(leftScroll);
     auto *leftLayout = new QVBoxLayout(leftBox);
+    leftLayout->setContentsMargins(4, 4, 4, 4);
+    leftLayout->setSpacing(8);
+    leftScroll->setWidget(leftBox);
 
     QFont small = this->font();
     small.setPointSizeF(this->font().pointSizeF() - 1);
-
-    // Compact in-window Display Settings (Language + Theme) so macOS users can switch directly in-window
-    groupAppearance_ = new QGroupBox(leftBox);
-    auto *gridApp = new QGridLayout(groupAppearance_);
-    lblUiLang_  = new QLabel(groupAppearance_);
-    lblUiTheme_ = new QLabel(groupAppearance_);
-    lblUiLang_->setFont(small);
-    lblUiTheme_->setFont(small);
-    comboUiLang_  = new QComboBox(groupAppearance_);
-    comboUiTheme_ = new QComboBox(groupAppearance_);
-    comboUiLang_->addItem(tr("System Default"), QStringLiteral("auto"));
-    comboUiLang_->addItem(QStringLiteral("English"), QStringLiteral("en"));
-    comboUiLang_->addItem(QStringLiteral("日本語 (Japanese)"), QStringLiteral("ja"));
-    comboUiTheme_->addItem(tr("Famicom / NES"), QStringLiteral("famicom"));
-    comboUiTheme_->addItem(tr("Light"), QStringLiteral("light"));
-    comboUiTheme_->addItem(tr("Gray"), QStringLiteral("gray"));
-    gridApp->addWidget(lblUiLang_,   0, 0);
-    gridApp->addWidget(comboUiLang_, 0, 1);
-    gridApp->addWidget(lblUiTheme_,  0, 2);
-    gridApp->addWidget(comboUiTheme_,0, 3);
-    gridApp->setColumnStretch(1, 1);
-    gridApp->setColumnStretch(3, 1);
-    gridApp->setHorizontalSpacing(6);
-    groupAppearance_->setLayout(gridApp);
-    leftLayout->addWidget(groupAppearance_);
-
-    connect(comboUiLang_, &QComboBox::currentIndexChanged, this, [this](int idx){
-        if (idx < 0) return;
-        const QString code = comboUiLang_->itemData(idx).toString();
-        if (code == currentLangCode_) return;
-        applyLanguage(code, true);
-        retranslateUi();
-    });
-    connect(comboUiTheme_, &QComboBox::currentIndexChanged, this, [this](int idx){
-        if (idx < 0) return;
-        const QString code = comboUiTheme_->itemData(idx).toString();
-        if (code == currentThemeCode_) return;
-        applyTheme(code, true);
-    });
 
     // Target group
     groupTargets_ = new QGroupBox(leftBox);
@@ -357,9 +340,17 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnLoadAdvanced = new QPushButton(groupBuffer_);
     progReadWrite = new QProgressBar(groupBuffer_);
 
+    btnWrite->setObjectName(QStringLiteral("btnWritePrimary"));
+    for (QPushButton *b : {btnLoadBinary, btnLoadAdvanced, btnClear, btnSave, btnRead, btnWrite}) {
+        b->setMinimumHeight(26);
+        b->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    }
+
     progReadWrite->setRange(0, 100);
     progReadWrite->setValue(0);
     progReadWrite->setTextVisible(true);
+    progReadWrite->setMinimumHeight(22);
+    progReadWrite->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     progReadWrite->setStyle(QStyleFactory::create("Fusion"));
 
     if (!lblBufSize)  lblBufSize  = new QLabel(groupBuffer_);
@@ -384,6 +375,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     btnBlankCheck  = new QPushButton(groupDevOps_);
     btnEraseDevice = new QPushButton(groupDevOps_);
     btnTestLogic   = new QPushButton(groupDevOps_);
+    for (QPushButton *b : {btnBlankCheck, btnEraseDevice, btnTestLogic}) {
+        b->setMinimumHeight(26);
+        b->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    }
 
     // Layout: two columns, then one full-width
     gridDO->addWidget(btnBlankCheck,  0, 0);
@@ -409,6 +404,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     groupOpts_->setLayout(gridO);
     leftLayout->addWidget(groupOpts_);
+
+    btnSettings_ = new QPushButton(leftBox);
+    btnSettings_->setMinimumHeight(26);
+    btnSettings_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    connect(btnSettings_, &QPushButton::clicked, this, &MainWindow::openSettingsDialog);
+    leftLayout->addWidget(btnSettings_);
     leftLayout->addStretch();
 
     // right side (hex + legend + log)
@@ -494,7 +495,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     tableHex->horizontalHeader()->setStretchLastSection(true);
 
     auto *split = new QSplitter(Qt::Horizontal, central);
-    split->addWidget(leftBox);
+    split->addWidget(leftScroll);
     split->addWidget(rightSplitter);
     split->setStretchFactor(0, 0);
     split->setStretchFactor(1, 1);
@@ -1646,11 +1647,6 @@ void MainWindow::applyLanguage(const QString &langCode, bool saveSetting) {
     if (actLangAuto_) actLangAuto_->setChecked(currentLangCode_ == QLatin1String("auto"));
     if (actLangEn_)   actLangEn_->setChecked(currentLangCode_ == QLatin1String("en"));
     if (actLangJa_)   actLangJa_->setChecked(currentLangCode_ == QLatin1String("ja"));
-    if (comboUiLang_) {
-        QSignalBlocker block(comboUiLang_);
-        const int idx = comboUiLang_->findData(currentLangCode_);
-        if (idx >= 0) comboUiLang_->setCurrentIndex(idx);
-    }
 }
 
 void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
@@ -1668,81 +1664,79 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
     if (actThemeFamicom_) actThemeFamicom_->setChecked(currentThemeCode_ == QLatin1String("famicom"));
     if (actThemeLight_)   actThemeLight_->setChecked(currentThemeCode_ == QLatin1String("light"));
     if (actThemeGray_)    actThemeGray_->setChecked(currentThemeCode_ == QLatin1String("gray"));
-    if (comboUiTheme_) {
-        QSignalBlocker block(comboUiTheme_);
-        const int idx = comboUiTheme_->findData(currentThemeCode_);
-        if (idx >= 0) comboUiTheme_->setCurrentIndex(idx);
+
+    // Use Fusion style so palettes, checkmarks, comboboxes, and button heights render reliably on macOS/Windows/Linux
+    static bool fusionApplied = false;
+    if (!fusionApplied) {
+        if (QStyle *fusion = QStyleFactory::create(QStringLiteral("Fusion"))) {
+            qApp->setStyle(fusion);
+        }
+        fusionApplied = true;
     }
 
+    QPalette pal;
     QString qss;
     if (currentThemeCode_ == QLatin1String("famicom")) {
         // Famicom / NES inspired: slightly warm yellowish-cream white + Famicom crimson red + gold trim
+        const QColor bg(QStringLiteral("#F2EBD5"));
+        const QColor card(QStringLiteral("#FAF5E4"));
+        const QColor base(QStringLiteral("#FFFDF7"));
+        const QColor alt(QStringLiteral("#F4EDE0"));
+        const QColor text(QStringLiteral("#2B1B17"));
+        const QColor btn(QStringLiteral("#EDE3C6"));
+        const QColor hi(QStringLiteral("#A61C24"));
+        const QColor hiText(QStringLiteral("#FFF9EB"));
+        const QColor dis(QStringLiteral("#9C8E75"));
+        const QColor mid(QStringLiteral("#C9BA95"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#9C8E75")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#E6DEC7")));
+
         qss = QStringLiteral(R"(
-            QMainWindow, QDialog { background: #F2EBD5; color: #2B1B17; }
-            QWidget { color: #2B1B17; }
             QGroupBox {
-                background: #FAF5E4;
-                border: 2px solid #D5C8A3;
-                border-radius: 7px;
-                margin-top: 12px;
-                padding-top: 8px;
+                background-color: #FAF5E4;
+                border: 1.5px solid #C9BA95;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
                 font-weight: bold;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                left: 10px;
+                left: 8px;
                 padding: 0 5px;
                 color: #9E1B22;
-                background: #FAF5E4;
+                background-color: #F2EBD5;
             }
-            QPushButton {
-                background: #EDE3C6;
-                color: #2B1B17;
-                border: 1.5px solid #B8A67D;
-                border-radius: 5px;
-                padding: 5px 10px;
-                font-weight: 600;
-            }
-            QPushButton:hover:enabled {
-                background: #A61C24;
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #A61C24;
                 color: #FFF9EB;
-                border-color: #7D1218;
+                border: 1px solid #C59B38;
+                font-weight: bold;
             }
-            QPushButton:pressed:enabled { background: #7D1218; color: #FFF9EB; }
-            QPushButton:disabled { background: #E9E2CE; color: #9C8E75; border-color: #D5CBB1; }
-            QPushButton#btnWritePrimary, QDialogButtonBox QPushButton:default {
-                background: #A61C24;
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #88141B;
                 color: #FFF9EB;
-                border: 1.5px solid #C59B38;
-            }
-            QComboBox, QLineEdit {
-                background: #FFFDF7;
-                color: #2B1B17;
-                border: 1.5px solid #C6B792;
-                border-radius: 4px;
-                padding: 4px 6px;
-                selection-background-color: #A61C24;
-                selection-color: #FFF9EB;
-            }
-            QComboBox QAbstractItemView {
-                background: #FFFDF7;
-                color: #2B1B17;
-                selection-background-color: #A61C24;
-                selection-color: #FFF9EB;
-            }
-            QTableView, QPlainTextEdit {
-                background: #FFFDF7;
-                alternate-background-color: #F4EDE0;
-                color: #2B1B17;
-                border: 1.5px solid #C6B792;
-                border-radius: 4px;
-                selection-background-color: #A61C24;
-                selection-color: #FFF9EB;
-                gridline-color: #E5DAC0;
             }
             QHeaderView::section {
-                background: #A61C24;
+                background-color: #A61C24;
                 color: #FFF8E7;
                 padding: 4px 6px;
                 border: none;
@@ -1750,71 +1744,74 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 font-weight: bold;
             }
             QProgressBar {
-                background: #E8DFC5;
-                color: #2B1B17;
-                border: 1.5px solid #B8A67D;
-                border-radius: 5px;
+                border: 1px solid #B8A67D;
+                border-radius: 4px;
                 text-align: center;
                 font-weight: bold;
             }
             QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #9E1B22, stop:1 #C92A33);
+                background-color: #A61C24;
                 border-radius: 3px;
             }
-            QCheckBox::indicator { width: 15px; height: 15px; border: 1.5px solid #9E1B22; border-radius: 3px; background: #FFFDF7; }
-            QCheckBox::indicator:checked { background: #A61C24; border-color: #7D1218; }
         )");
     } else if (currentThemeCode_ == QLatin1String("light")) {
+        const QColor bg(QStringLiteral("#F3F5F8"));
+        const QColor base(QStringLiteral("#FFFFFF"));
+        const QColor alt(QStringLiteral("#F8FAFC"));
+        const QColor text(QStringLiteral("#1E293B"));
+        const QColor btn(QStringLiteral("#E7ECF2"));
+        const QColor hi(QStringLiteral("#2563EB"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#94A3B8"));
+        const QColor mid(QStringLiteral("#CBD5E1"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, base);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#94A3B8")));
+        pal.setColor(QPalette::Light, base);
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#F1F5F9")));
+
         qss = QStringLiteral(R"(
-            QMainWindow, QDialog { background: #F3F5F8; color: #1E293B; }
-            QWidget { color: #1E293B; }
             QGroupBox {
-                background: #FFFFFF;
+                background-color: #FFFFFF;
                 border: 1px solid #CBD5E1;
-                border-radius: 7px;
-                margin-top: 12px;
-                padding-top: 8px;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
                 font-weight: bold;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                left: 10px;
+                left: 8px;
                 padding: 0 5px;
                 color: #1D4ED8;
-                background: #FFFFFF;
+                background-color: #F3F5F8;
             }
-            QPushButton {
-                background: #F1F5F9;
-                color: #1E293B;
-                border: 1px solid #CBD5E1;
-                border-radius: 5px;
-                padding: 5px 10px;
-                font-weight: 600;
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #2563EB;
+                color: #FFFFFF;
+                border: 1px solid #1D4ED8;
+                font-weight: bold;
             }
-            QPushButton:hover:enabled { background: #2563EB; color: #FFFFFF; border-color: #1D4ED8; }
-            QPushButton:disabled { background: #F8FAFC; color: #94A3B8; border-color: #E2E8F0; }
-            QComboBox, QLineEdit {
-                background: #FFFFFF;
-                color: #1E293B;
-                border: 1px solid #CBD5E1;
-                border-radius: 4px;
-                padding: 4px 6px;
-                selection-background-color: #2563EB;
-                selection-color: #FFFFFF;
-            }
-            QTableView, QPlainTextEdit {
-                background: #FFFFFF;
-                alternate-background-color: #F8FAFC;
-                color: #0F172A;
-                border: 1px solid #CBD5E1;
-                border-radius: 4px;
-                selection-background-color: #2563EB;
-                selection-color: #FFFFFF;
-                gridline-color: #E2E8F0;
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #1D4ED8;
             }
             QHeaderView::section {
-                background: #E2E8F0;
+                background-color: #E2E8F0;
                 color: #1E293B;
                 padding: 4px 6px;
                 border: none;
@@ -1822,73 +1819,76 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 font-weight: bold;
             }
             QProgressBar {
-                background: #E2E8F0;
-                color: #0F172A;
                 border: 1px solid #CBD5E1;
-                border-radius: 5px;
+                border-radius: 4px;
                 text-align: center;
                 font-weight: bold;
             }
-            QProgressBar::chunk { background: #2563EB; border-radius: 3px; }
+            QProgressBar::chunk {
+                background-color: #2563EB;
+                border-radius: 3px;
+            }
         )");
     } else {
         // Gray theme
+        const QColor bg(QStringLiteral("#2B2F36"));
+        const QColor card(QStringLiteral("#323740"));
+        const QColor base(QStringLiteral("#1E2126"));
+        const QColor alt(QStringLiteral("#252930"));
+        const QColor text(QStringLiteral("#E5E7EB"));
+        const QColor btn(QStringLiteral("#3F4550"));
+        const QColor hi(QStringLiteral("#3B82F6"));
+        const QColor hiText(QStringLiteral("#FFFFFF"));
+        const QColor dis(QStringLiteral("#6B7280"));
+        const QColor mid(QStringLiteral("#4B5260"));
+
+        pal.setColor(QPalette::Window, bg);
+        pal.setColor(QPalette::WindowText, text);
+        pal.setColor(QPalette::Base, base);
+        pal.setColor(QPalette::AlternateBase, alt);
+        pal.setColor(QPalette::Text, text);
+        pal.setColor(QPalette::ToolTipBase, card);
+        pal.setColor(QPalette::ToolTipText, text);
+        pal.setColor(QPalette::Button, btn);
+        pal.setColor(QPalette::ButtonText, text);
+        pal.setColor(QPalette::Highlight, hi);
+        pal.setColor(QPalette::HighlightedText, hiText);
+        pal.setColor(QPalette::Mid, mid);
+        pal.setColor(QPalette::Dark, QColor(QStringLiteral("#1B1E23")));
+        pal.setColor(QPalette::Light, QColor(QStringLiteral("#525866")));
+        pal.setColor(QPalette::Disabled, QPalette::WindowText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Text, dis);
+        pal.setColor(QPalette::Disabled, QPalette::ButtonText, dis);
+        pal.setColor(QPalette::Disabled, QPalette::Button, QColor(QStringLiteral("#2E3239")));
+
         qss = QStringLiteral(R"(
-            QMainWindow, QDialog { background: #25282E; color: #E5E7EB; }
-            QWidget { color: #E5E7EB; }
             QGroupBox {
-                background: #2F333B;
-                border: 1px solid #454C59;
-                border-radius: 7px;
-                margin-top: 12px;
-                padding-top: 8px;
+                background-color: #323740;
+                border: 1px solid #4B5260;
+                border-radius: 6px;
+                margin-top: 10px;
+                padding-top: 6px;
                 font-weight: bold;
             }
             QGroupBox::title {
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                left: 10px;
+                left: 8px;
                 padding: 0 5px;
                 color: #93C5FD;
-                background: #2F333B;
+                background-color: #2B2F36;
             }
-            QPushButton {
-                background: #3B404A;
-                color: #F3F4F6;
-                border: 1px solid #525866;
-                border-radius: 5px;
-                padding: 5px 10px;
-                font-weight: 600;
+            QPushButton#btnWritePrimary:enabled {
+                background-color: #3B82F6;
+                color: #FFFFFF;
+                border: 1px solid #2563EB;
+                font-weight: bold;
             }
-            QPushButton:hover:enabled { background: #3B82F6; color: #FFFFFF; border-color: #2563EB; }
-            QPushButton:disabled { background: #2A2D34; color: #6B7280; border-color: #373B44; }
-            QComboBox, QLineEdit {
-                background: #1E2126;
-                color: #F3F4F6;
-                border: 1px solid #4B5260;
-                border-radius: 4px;
-                padding: 4px 6px;
-                selection-background-color: #3B82F6;
-                selection-color: #FFFFFF;
-            }
-            QComboBox QAbstractItemView {
-                background: #1E2126;
-                color: #F3F4F6;
-                selection-background-color: #3B82F6;
-                selection-color: #FFFFFF;
-            }
-            QTableView, QPlainTextEdit {
-                background: #1B1E23;
-                alternate-background-color: #23272E;
-                color: #E5E7EB;
-                border: 1px solid #454C59;
-                border-radius: 4px;
-                selection-background-color: #3B82F6;
-                selection-color: #FFFFFF;
-                gridline-color: #2E3440;
+            QPushButton#btnWritePrimary:hover:enabled {
+                background-color: #2563EB;
             }
             QHeaderView::section {
-                background: #383D47;
+                background-color: #3B404A;
                 color: #E5E7EB;
                 padding: 4px 6px;
                 border: none;
@@ -1896,17 +1896,96 @@ void MainWindow::applyTheme(const QString &themeCode, bool saveSetting) {
                 font-weight: bold;
             }
             QProgressBar {
-                background: #1E2126;
-                color: #F3F4F6;
                 border: 1px solid #4B5260;
-                border-radius: 5px;
+                border-radius: 4px;
                 text-align: center;
                 font-weight: bold;
             }
-            QProgressBar::chunk { background: #3B82F6; border-radius: 3px; }
+            QProgressBar::chunk {
+                background-color: #3B82F6;
+                border-radius: 3px;
+            }
         )");
     }
+
+    qApp->setPalette(pal);
     qApp->setStyleSheet(qss);
+}
+
+void MainWindow::openSettingsDialog() {
+    QDialog dlg(this);
+    dlg.setMinimumWidth(420);
+
+    auto *vbox = new QVBoxLayout(&dlg);
+    auto *form = new QFormLayout();
+
+    auto *comboLang = new QComboBox(&dlg);
+    comboLang->addItem(tr("System Default"), QStringLiteral("auto"));
+    comboLang->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    comboLang->addItem(QStringLiteral("日本語 (Japanese)"), QStringLiteral("ja"));
+    if (const int i = comboLang->findData(currentLangCode_); i >= 0) {
+        comboLang->setCurrentIndex(i);
+    }
+
+    auto *comboTheme = new QComboBox(&dlg);
+    comboTheme->addItem(tr("Famicom / NES (Red & Cream)"), QStringLiteral("famicom"));
+    comboTheme->addItem(tr("Light"), QStringLiteral("light"));
+    comboTheme->addItem(tr("Gray"), QStringLiteral("gray"));
+    if (const int i = comboTheme->findData(currentThemeCode_); i >= 0) {
+        comboTheme->setCurrentIndex(i);
+    }
+
+    auto *lblLangRow = new QLabel(&dlg);
+    auto *lblThemeRow = new QLabel(&dlg);
+    auto *lblHint = new QLabel(&dlg);
+    lblHint->setWordWrap(true);
+
+    form->addRow(lblLangRow, comboLang);
+    form->addRow(lblThemeRow, comboTheme);
+    vbox->addLayout(form);
+    vbox->addWidget(lblHint);
+
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dlg);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::accept);
+    vbox->addWidget(buttons);
+
+    auto syncDlgText = [&]() {
+        dlg.setWindowTitle(tr("Settings"));
+        lblLangRow->setText(tr("Language:"));
+        lblThemeRow->setText(tr("Theme:"));
+        lblHint->setText(tr("Changes are applied immediately and saved automatically."));
+        if (const int i = comboLang->findData(QStringLiteral("auto")); i >= 0) {
+            comboLang->setItemText(i, tr("System Default"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("famicom")); i >= 0) {
+            comboTheme->setItemText(i, tr("Famicom / NES (Red & Cream)"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("light")); i >= 0) {
+            comboTheme->setItemText(i, tr("Light"));
+        }
+        if (const int i = comboTheme->findData(QStringLiteral("gray")); i >= 0) {
+            comboTheme->setItemText(i, tr("Gray"));
+        }
+    };
+    syncDlgText();
+
+    connect(comboLang, &QComboBox::currentIndexChanged, &dlg, [&](int idx) {
+        if (idx < 0) return;
+        const QString code = comboLang->itemData(idx).toString();
+        if (code == currentLangCode_) return;
+        applyLanguage(code, true);
+        retranslateUi();
+        syncDlgText();
+    });
+
+    connect(comboTheme, &QComboBox::currentIndexChanged, &dlg, [&](int idx) {
+        if (idx < 0) return;
+        const QString code = comboTheme->itemData(idx).toString();
+        if (code == currentThemeCode_) return;
+        applyTheme(code, true);
+    });
+
+    dlg.exec();
 }
 
 void MainWindow::retranslateUi() {
@@ -1915,6 +1994,7 @@ void MainWindow::retranslateUi() {
 
     if (menuApp_)        menuApp_->setTitle(tr("&FireMinipro"));
     if (actAbout_)       actAbout_->setText(tr("&About FireMinipro…"));
+    if (actPreferences_) actPreferences_->setText(tr("&Settings…"));
     if (actQuit_)        actQuit_->setText(tr("&Quit"));
     if (menuLanguage_)   menuLanguage_->setTitle(tr("&Language"));
     if (actLangAuto_)    actLangAuto_->setText(tr("System Default"));
@@ -1922,24 +2002,8 @@ void MainWindow::retranslateUi() {
     if (actThemeFamicom_) actThemeFamicom_->setText(tr("Famicom / NES (Red & Cream)"));
     if (actThemeLight_)  actThemeLight_->setText(tr("Light"));
     if (actThemeGray_)   actThemeGray_->setText(tr("Gray"));
-
-    if (groupAppearance_) groupAppearance_->setTitle(tr("Display"));
-    if (lblUiLang_)       lblUiLang_->setText(tr("Language:"));
-    if (lblUiTheme_)      lblUiTheme_->setText(tr("Theme:"));
-    if (comboUiLang_) {
-        QSignalBlocker block(comboUiLang_);
-        const int idx = comboUiLang_->findData(QStringLiteral("auto"));
-        if (idx >= 0) comboUiLang_->setItemText(idx, tr("System Default"));
-    }
-    if (comboUiTheme_) {
-        QSignalBlocker block(comboUiTheme_);
-        if (const int i = comboUiTheme_->findData(QStringLiteral("famicom")); i >= 0)
-            comboUiTheme_->setItemText(i, tr("Famicom / NES"));
-        if (const int i = comboUiTheme_->findData(QStringLiteral("light")); i >= 0)
-            comboUiTheme_->setItemText(i, tr("Light"));
-        if (const int i = comboUiTheme_->findData(QStringLiteral("gray")); i >= 0)
-            comboUiTheme_->setItemText(i, tr("Gray"));
-    }
+    if (actOpenSettings_) actOpenSettings_->setText(tr("Open Settings Window…"));
+    if (btnSettings_)    btnSettings_->setText(tr("Settings"));
 
     if (groupTargets_) groupTargets_->setTitle(tr("Target"));
     if (lblProg_)      lblProg_->setText(tr("Programmer:"));

@@ -48,6 +48,7 @@ private:
     // Menus & i18n
     QMenu       *menuApp_{};
     QAction     *actAbout_{};
+    QAction     *actPreferences_{};
     QAction     *actQuit_{};
     QMenu       *menuLanguage_{};
     QAction     *actLangAuto_{};
@@ -57,6 +58,7 @@ private:
     QAction     *actThemeFamicom_{};
     QAction     *actThemeLight_{};
     QAction     *actThemeGray_{};
+    QAction     *actOpenSettings_{};
     QTranslator *qtTranslator_{};
     QTranslator *appTranslator_{};
     QString      currentLangCode_{QStringLiteral("auto")};
@@ -65,11 +67,7 @@ private:
     ProcessHandling::ChipInfo lastChipInfo_{};
 
     // Group boxes & labels for retranslation
-    QGroupBox   *groupAppearance_{};
-    QLabel      *lblUiLang_{};
-    QLabel      *lblUiTheme_{};
-    QComboBox   *comboUiLang_{};
-    QComboBox   *comboUiTheme_{};
+    QPushButton *btnSettings_{};
     QGroupBox   *groupTargets_{};
     QLabel      *lblProg_{};
     QLabel      *lblDev_{};
@@ -172,6 +170,7 @@ private:
     void clearChipInfo();
     void applyLanguage(const QString &langCode, bool saveSetting);
     void applyTheme(const QString &themeCode, bool saveSetting);
+    void openSettingsDialog();
     void retranslateUi();
     QString exportBufferToTempFileLocal(const QString& baseName);
 
